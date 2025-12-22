@@ -1,34 +1,27 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; // For redirection
-import { supabase } from "../lib/supabaseClient"; // Ensure you have this client file
+import { useNavigate, Link } from "react-router-dom"; // Import Link here
+import { supabase } from "../lib/supabaseClient";
 
 const Login: React.FC = () => {
-  // 1. Define states for user inputs and UI behavior
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+  const navigate = useNavigate();
 
-  const navigate = useNavigate(); // Hook for programmatic navigation
-
-  // 2. The authentication function
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Call Supabase to sign in with password
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
     if (error) {
-      alert("Login failed: " + error.message);
+      alert(error.message);
       setLoading(false);
     } else {
-      console.log("Success! User data:", data);
-      // 3. Redirect to the dashboard upon successful login
       navigate("/dashboard");
     }
   };
@@ -38,18 +31,23 @@ const Login: React.FC = () => {
       <main className="flex-grow flex items-center justify-center px-4">
         <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md border border-gray-200">
           <div className="text-center mb-8">
-            <h1 className="text-left text-4xl font-serif font-bold text-gray-900 mb-2">
+            <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2 text-left">
               Log in
             </h1>
-            <p className="text-gray-600 text-left">
+            <p className="text-left text-gray-600">
               Need an account?{" "}
-              <a href="#" className="text-teal-600 hover:underline">
+              {/* This is the fixed link pointing to /register */}
+              <Link
+                to="/register"
+                className="text-teal-600 hover:underline font-semibold"
+              >
                 Create an account
-              </a>
+              </Link>
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
+            {/* ... rest of your form fields ... */}
             <div>
               <label
                 htmlFor="email"
@@ -61,10 +59,9 @@ const Login: React.FC = () => {
                 type="email"
                 id="email"
                 required
-                value={email} // Controlled component
+                value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 outline-none transition-colors"
-                placeholder="name@uthm.edu.my"
               />
             </div>
 
@@ -80,7 +77,7 @@ const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-teal-600 text-sm font-semibold hover:underline"
+                  className="text-teal-600 text-sm font-semibold hover:underline focus:outline-none"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -89,34 +86,16 @@ const Login: React.FC = () => {
                 type={showPassword ? "text" : "password"}
                 id="password"
                 required
-                value={password} // Controlled component
+                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 outline-none transition-colors"
               />
             </div>
 
-            <div className="flex items-center">
-              <input
-                id="keep-logged-in"
-                type="checkbox"
-                checked={keepLoggedIn}
-                onChange={() => setKeepLoggedIn(!keepLoggedIn)}
-                className="h-5 w-5 text-teal-600 border-gray-300 rounded cursor-pointer"
-              />
-              <label
-                htmlFor="keep-logged-in"
-                className="ml-2 block text-sm font-semibold text-gray-700 cursor-pointer"
-              >
-                Keep me logged in
-              </label>
-            </div>
-
             <button
               type="submit"
-              disabled={loading} // Prevent double submission
-              className={`w-full py-3 px-4 bg-[#ff368c] hover:bg-[#e62e7a] text-white font-bold rounded-full text-lg transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-[#ff368c] ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-[#ff368c] hover:bg-[#e62e7a] text-white font-bold rounded-full text-lg transition-colors disabled:opacity-50"
             >
               {loading ? "Logging in..." : "Log in"}
             </button>
