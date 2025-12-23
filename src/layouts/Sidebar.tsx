@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Image, Settings, LogOut, User } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
+import React, { useEffect, useState } from "react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,6 +11,36 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [full_name, setFullName] = useState<string>("User");
+  const [email, setUserEmail] = useState<string>("");
+
+  useEffect(() => {
+    const getProfileName = async () => {
+      // 2. Get the current authenticated user's ID
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        // Fast way: Set email directly from the Auth object
+        setUserEmail(user.email ?? "");
+
+        // 3. Fetch specific profile details from your table
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", user.id)
+          .single();
+
+        if (data) {
+          setFullName(data.full_name || "User");
+          // You can also use data.email if you want the table's version
+        }
+      }
+    };
+
+    getProfileName();
+  }, []);
 
   const menuItems = [
     { name: "Dashboard", path: "/dashboard", icon: <Home size={20} /> },
@@ -58,11 +90,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">
-              Student Name
+              {full_name}
             </p>
-            <p className="text-xs text-gray-500 truncate">
-              student@uthm.edu.my
-            </p>
+            <p className="text-xs text-gray-500 truncate">{email}</p>
           </div>
         </div>
       </div>
