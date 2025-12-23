@@ -11,11 +11,13 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
+import { useNavigate } from "react-router-dom"; // Add this import at the top
 
 export default function Patients() {
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
 
   // Filter States
   const [statusFilter, setStatusFilter] = useState("All");
@@ -26,6 +28,14 @@ export default function Patients() {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      console.log("Current user:", data.user);
+    };
+    checkUser();
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -106,7 +116,10 @@ export default function Patients() {
             Manage and monitor children's therapy progress.
           </p>
         </div>
-        <button className="flex items-center justify-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95">
+        <button
+          onClick={() => navigate("add")} // relative path
+          className="flex items-center justify-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95"
+        >
           <Plus size={20} />
           <span>Add New Patient</span>
         </button>

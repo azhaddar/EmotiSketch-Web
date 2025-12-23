@@ -9,26 +9,22 @@ import Register from "./pages/Register";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
+import AddPatient from "./pages/AddPatient";
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected Routes - MUST use DashboardLayout as wrapper */}
+        {/* Dashboard Group */}
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
-          <Route path="patients" element={<Patients />} />{" "}
-          {/* New Nested Route */}
-          {/* Add more nested routes here */}
-          {/* <Route path="sketches" element={<Sketches />} /> */}
-          {/* <Route path="settings" element={<Settings />} /> */}
+          <Route path="patients" element={<Patients />} />
+          <Route path="patients/add" element={<AddPatient />} />
         </Route>
 
-        {/* Redirect any unknown routes */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
