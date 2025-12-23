@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Image, Settings, LogOut, User } from "lucide-react";
+import { Home, Image, Settings, LogOut, User, Users } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import React, { useEffect, useState } from "react";
 
@@ -45,9 +45,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const menuItems = [
     { name: "Dashboard", path: "/dashboard", icon: <Home size={20} /> },
     {
-      name: "My Sketches",
-      path: "/dashboard/sketches",
-      icon: <Image size={20} />,
+      name: "Patients",
+      path: "/dashboard/patients",
+      icon: <Users size={20} />,
     },
     {
       name: "Settings",
