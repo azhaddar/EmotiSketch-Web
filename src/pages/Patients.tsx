@@ -11,7 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { useNavigate } from "react-router-dom"; // Add this import at the top
+import { useNavigate } from "react-router-dom";
 
 export default function Patients() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -22,7 +22,7 @@ export default function Patients() {
   // Filter States
   const [statusFilter, setStatusFilter] = useState("All");
   const [genderFilter, setGenderFilter] = useState("All");
-  const [ageFilter, setAgeFilter] = useState("All"); // Added Age Filter State
+  const [ageFilter, setAgeFilter] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Pagination State
@@ -30,20 +30,12 @@ export default function Patients() {
   const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      console.log("Current user:", data.user);
-    };
-    checkUser();
-  }, []);
-
-  useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchPatients();
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, statusFilter, genderFilter, ageFilter]); // Added ageFilter to watch list
+  }, [searchTerm, statusFilter, genderFilter, ageFilter]);
 
   async function fetchPatients() {
     try {
@@ -54,22 +46,18 @@ export default function Patients() {
         .select("*")
         .order("full_name", { ascending: true });
 
-      // 1. Search Filter
       if (searchTerm) {
         query = query.ilike("full_name", `%${searchTerm}%`);
       }
 
-      // 2. Status Filter
       if (statusFilter !== "All") {
         query = query.eq("status", statusFilter);
       }
 
-      // 3. Gender Filter
       if (genderFilter !== "All") {
         query = query.eq("gender", genderFilter);
       }
 
-      // 4. Age Filter Logic (Using ranges suitable for children)
       if (ageFilter !== "All") {
         if (ageFilter === "5-7") {
           query = query.gte("age", 5).lte("age", 7);
@@ -89,6 +77,36 @@ export default function Patients() {
       console.error("Error fetching patients:", error.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Edit Patient - Navigate with patient data
+  function handleEdit(patient: any) {
+    navigate(`/dashboard/patients/edit/${patient.id}`, {
+      state: { patient },
+    });
+  }
+
+  // Delete Patient
+  async function handleDelete(patientId: string, patientName: string) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${patientName}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .delete()
+        .eq("id", patientId);
+
+      if (error) throw error;
+
+      alert("Patient deleted successfully!");
+      fetchPatients(); // Refresh the list
+    } catch (error: any) {
+      alert(`Error deleting patient: ${error.message}`);
     }
   }
 
@@ -117,7 +135,7 @@ export default function Patients() {
           </p>
         </div>
         <button
-          onClick={() => navigate("add")} // relative path
+          onClick={() => navigate("add")}
           className="flex items-center justify-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95"
         >
           <Plus size={20} />
@@ -161,7 +179,6 @@ export default function Patients() {
             />
           </button>
 
-          {/* UPDATED FILTER DROPDOWN WITH AGE */}
           {isFilterOpen && (
             <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200 z-20">
               <div className="space-y-5">
@@ -296,12 +313,16 @@ export default function Patients() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
+                              onClick={() => handleEdit(patient)}
                               title="Edit Patient"
                               className="p-2 text-amber-600 hover:bg-amber-100 rounded-xl transition-all active:scale-95"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
+                              onClick={() =>
+                                handleDelete(patient.id, patient.full_name)
+                              }
                               title="Delete Patient"
                               className="p-2 text-red-600 hover:bg-red-100 rounded-xl transition-all active:scale-95"
                             >
