@@ -37,27 +37,59 @@ export default function Patients() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, statusFilter, genderFilter, ageFilter]);
 
+  // src/pages/Patients.tsx
+
   async function fetchPatients() {
     try {
       setLoading(true);
 
+      // 1. Get the current logged-in user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      // 2. Check if this user is an admin or therapist
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      // 3. Build the query and JOIN the profiles table for the Guardian's name
       let query = supabase
         .from("patients")
-        .select("*")
+        .select(
+          `
+        *,
+        guardian:profiles!guardian_id (
+          full_name
+        )
+      `
+        )
         .order("full_name", { ascending: true });
 
+      // 4. ROLE FILTER: Only restrict by therapist_id if the user is NOT an admin
+      if (profile?.role !== "admin") {
+        query = query.eq("therapist_id", user.id);
+      }
+
+      // 5. SEARCH FILTER
       if (searchTerm) {
         query = query.ilike("full_name", `%${searchTerm}%`);
       }
 
+      // 6. STATUS FILTER
       if (statusFilter !== "All") {
         query = query.eq("status", statusFilter);
       }
 
+      // 7. GENDER FILTER
       if (genderFilter !== "All") {
         query = query.eq("gender", genderFilter);
       }
 
+      // 8. AGE RANGE FILTER
       if (ageFilter !== "All") {
         if (ageFilter === "5-7") {
           query = query.gte("age", 5).lte("age", 7);
@@ -68,6 +100,7 @@ export default function Patients() {
         }
       }
 
+      // 9. Execute the final query
       const { data, error } = await query;
 
       if (error) throw error;
@@ -282,6 +315,10 @@ export default function Patients() {
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-600">
                     <th className="px-6 py-4">Patient Name</th>
                     <th className="px-6 py-4">Age</th>
+                    <th className="px-6 py-4">Gender</th>
+                    <th className="px-6 py-4">Total Sketch</th>
+                    <th className="px-6 py-4">Personality</th>
+                    <th className="px-6 py-4">Parent's Name</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
@@ -298,6 +335,19 @@ export default function Patients() {
                         </td>
                         <td className="px-6 py-4 text-gray-600">
                           {patient.age} y/o
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {patient.gender}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {patient.total_sketches || 0}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
+                          {patient.personality || "—"}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {/* This accesses the joined profile data */}
+                          {patient.guardian?.full_name || "Not assigned"}
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -335,7 +385,7 @@ export default function Patients() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={8}
                         className="px-6 py-10 text-center text-gray-500 italic"
                       >
                         No patients match the selected criteria.

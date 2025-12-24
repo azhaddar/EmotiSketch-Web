@@ -7,6 +7,7 @@ const Register: React.FC = () => {
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,8 +17,9 @@ const Register: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(""); // Clear previous errors
 
-    const { error } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -27,8 +29,8 @@ const Register: React.FC = () => {
       },
     });
 
-    if (error) {
-      alert(error.message);
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
     } else {
       alert(
@@ -84,6 +86,13 @@ const Register: React.FC = () => {
             <span className="text-sm text-gray-500">or</span>
             <div className="flex-1 h-px bg-gray-300"></div>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleRegister} className="space-y-4">
             {/* Full Name Input */}
@@ -144,7 +153,7 @@ const Register: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#e13d7d] text-white rounded-lg py-3 font-medium hover:bg-[#c42f6a] transition-colors"
+              className="w-full bg-[#e13d7d] text-white rounded-lg py-3 font-medium hover:bg-[#c42f6a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating account..." : "Create account"}
             </button>
