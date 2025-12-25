@@ -5,6 +5,7 @@ import {
   Settings,
   LogOut,
   User,
+  ShieldUser,
   Users,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
@@ -38,6 +39,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           .select("full_name, email, role")
           .eq("id", user.id)
           .single();
+        if (data) {
+          console.log("Current User Role from DB:", data.role); // ADD THIS LINE
+          setFullName(data.full_name || "User");
+          setRole(data.role);
+        }
 
         if (data) {
           setFullName(data.full_name || "User");
@@ -70,6 +76,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: <ChartNoAxesCombined size={20} />,
       // Visible to parents (specifically "user" role) and admin
       visible: role === "user" || role === "admin",
+    },
+    {
+      name: "Users",
+      path: "/dashboard/users",
+      icon: <ShieldUser size={20} />,
+      visible: role === "admin",
     },
     {
       name: "Settings",

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
-  UserPlus,
+  Plus,
   Filter,
   Loader2,
   Edit2,
@@ -9,145 +10,107 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  UserPlus,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { useNavigate } from "react-router-dom";
 
-export default function Patients() {
-  const [patients, setPatients] = useState<any[]>([]);
+export default function UsersManagement() {
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const navigate = useNavigate();
 
-  // Filter States
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [genderFilter, setGenderFilter] = useState("All");
-  const [ageFilter, setAgeFilter] = useState("All");
+  // Filter States (Matching Patients style)
+  const [roleFilter, setRoleFilter] = useState("All");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
+  function handleEdit(user: any) {
+    navigate(`/dashboard/users/edit/${user.id}`, {
+      state: { user },
+    });
+  }
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchPatients();
+      fetchUsers();
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, statusFilter, genderFilter, ageFilter]);
+  }, [searchTerm, roleFilter]);
 
-  // src/pages/Patients.tsx
-
-  async function fetchPatients() {
-    try {
-      setLoading(true);
-
-      // 1. Get the current logged-in user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
-
-      // 2. Check if this user is an admin or therapist
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      // 3. Build the query and JOIN the profiles table for the Guardian's name
-      let query = supabase
-        .from("patients")
-        .select(
-          `
-        *,
-        guardian:profiles!guardian_id (
-          full_name
-        )
-      `
-        )
-        .order("full_name", { ascending: true });
-
-      // 4. ROLE FILTER: Only restrict by therapist_id if the user is NOT an admin
-      if (profile?.role !== "admin") {
-        query = query.eq("therapist_id", user.id);
-      }
-
-      // 5. SEARCH FILTER
-      if (searchTerm) {
-        query = query.ilike("full_name", `%${searchTerm}%`);
-      }
-
-      // 6. STATUS FILTER
-      if (statusFilter !== "All") {
-        query = query.eq("status", statusFilter);
-      }
-
-      // 7. GENDER FILTER
-      if (genderFilter !== "All") {
-        query = query.eq("gender", genderFilter);
-      }
-
-      // 8. AGE RANGE FILTER
-      if (ageFilter !== "All") {
-        if (ageFilter === "5-7") {
-          query = query.gte("age", 5).lte("age", 7);
-        } else if (ageFilter === "8-10") {
-          query = query.gte("age", 8).lte("age", 10);
-        } else if (ageFilter === "11+") {
-          query = query.gte("age", 11);
-        }
-      }
-
-      // 9. Execute the final query
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setPatients(data || []);
-      setCurrentPage(1);
-    } catch (error: any) {
-      console.error("Error fetching patients:", error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Edit Patient - Navigate with patient data
-  function handleEdit(patient: any) {
-    navigate(`/dashboard/patients/edit/${patient.id}`, {
-      state: { patient },
-    });
-  }
-
-  // Delete Patient
-  async function handleDelete(patientId: string, patientName: string) {
+  async function handleDelete(userId: string, userName: string) {
+    // 1. Confirm with the admin before proceeding
     const confirmed = window.confirm(
-      `Are you sure you want to delete ${patientName}? This action cannot be undone.`
+      `Are you sure you want to delete ${userName}? This will remove their profile from the system.`
     );
 
     if (!confirmed) return;
 
     try {
+      setLoading(true); // Show loading state while deleting
+
+      // 2. Execute the delete command
       const { error } = await supabase
-        .from("patients")
+        .from("profiles")
         .delete()
-        .eq("id", patientId);
+        .eq("id", userId);
 
       if (error) throw error;
 
-      alert("Patient deleted successfully!");
-      fetchPatients(); // Refresh the list
+      alert("User profile deleted successfully!");
+
+      // 3. Refresh the list to reflect the changes
+      fetchUsers();
     } catch (error: any) {
-      alert(`Error deleting patient: ${error.message}`);
+      // Handle potential Foreign Key errors (e.g., if a therapist still has patients)
+      if (error.code === "23503") {
+        alert(
+          "Cannot delete this user: They are still assigned as a therapist or guardian to existing patients."
+        );
+      } else {
+        alert(`Error deleting user: ${error.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function fetchUsers() {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name", { ascending: true });
+
+      if (searchTerm) {
+        query = query.or(
+          `full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+        );
+      }
+
+      if (roleFilter !== "All") {
+        query = query.eq("role", roleFilter.toLowerCase());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setUsers(data || []);
+      setCurrentPage(1);
+    } catch (error: any) {
+      console.error("Error fetching users:", error.message);
+    } finally {
+      setLoading(false);
     }
   }
 
   // Pagination Logic
-  const totalPages = Math.ceil(patients.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
-  const currentItems = patients.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = users.slice(indexOfFirstItem, indexOfLastItem);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -157,26 +120,26 @@ export default function Patients() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header Section */}
+      {/* Header Section - Matches Patients.tsx */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Patient Directory
+            User Management
           </h1>
           <p className="text-gray-600">
-            Manage and monitor children's therapy progress.
+            Manage system access, roles, and administrative permissions.
           </p>
         </div>
         <button
-          onClick={() => navigate("add")}
+          onClick={() => navigate("add")} // Navigates to /dashboard/users/add
           className="flex items-center justify-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95"
         >
           <UserPlus size={20} />
-          <span>Add New Patient</span>
+          <span>Add New User</span>
         </button>
       </div>
 
-      {/* Control Bar */}
+      {/* Control Bar - Matches Patients.tsx */}
       <div className="relative bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center z-10">
         <div className="relative flex-1 max-w-md w-full">
           <Search
@@ -185,7 +148,7 @@ export default function Patients() {
           />
           <input
             type="text"
-            placeholder="Search by name..."
+            placeholder="Search by name or email..."
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -215,84 +178,32 @@ export default function Patients() {
           {isFilterOpen && (
             <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200 z-20">
               <div className="space-y-5">
-                {/* Status Filter */}
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-2 italic">
-                    Patient Status
+                    User Role
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {["All", "Active", "Inactive"].map((status) => (
+                    {["All", "Admin", "Therapist", "User"].map((role) => (
                       <button
-                        key={status}
-                        onClick={() => setStatusFilter(status)}
+                        key={role}
+                        onClick={() => setRoleFilter(role)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                           ${
-                            statusFilter === status
+                            roleFilter === role
                               ? "bg-[#e13d7d] text-white"
                               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                           }`}
                       >
-                        {status}
+                        {role}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* Age Range Filter */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2 italic">
-                    Age Range
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {["All", "5-7", "8-10", "11+"].map((age) => (
-                      <button
-                        key={age}
-                        onClick={() => setAgeFilter(age)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                          ${
-                            ageFilter === age
-                              ? "bg-[#e13d7d] text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                      >
-                        {age}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Gender Filter */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2 italic">
-                    Gender
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {["All", "Male", "Female"].map((gender) => (
-                      <button
-                        key={gender}
-                        onClick={() => setGenderFilter(gender)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                          ${
-                            genderFilter === gender
-                              ? "bg-[#e13d7d] text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                      >
-                        {gender}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <button
-                  onClick={() => {
-                    setStatusFilter("All");
-                    setGenderFilter("All");
-                    setAgeFilter("All");
-                  }}
+                  onClick={() => setRoleFilter("All")}
                   className="w-full text-center text-xs text-gray-400 hover:text-pink-500 underline mt-2 pt-2 border-t border-gray-50"
                 >
-                  Reset All Filters
+                  Reset Filters
                 </button>
               </div>
             </div>
@@ -300,7 +211,7 @@ export default function Patients() {
         </div>
       </div>
 
-      {/* Table Section */}
+      {/* Table Section - Matches Patients.tsx */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -313,67 +224,51 @@ export default function Patients() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-600">
-                    <th className="px-6 py-4">Patient Name</th>
-                    <th className="px-6 py-4">Age</th>
-                    <th className="px-6 py-4">Gender</th>
-                    <th className="px-6 py-4">Total Sketch</th>
-                    <th className="px-6 py-4">Personality</th>
-                    <th className="px-6 py-4">Parent's Name</th>
-                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Full Name</th>
+                    <th className="px-6 py-4">Email</th>
+                    <th className="px-6 py-4">Role</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {currentItems.length > 0 ? (
-                    currentItems.map((patient) => (
+                    currentItems.map((user) => (
                       <tr
-                        key={patient.id}
+                        key={user.id}
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 font-medium text-gray-900">
-                          {patient.full_name}
+                          {user.full_name}
                         </td>
                         <td className="px-6 py-4 text-gray-600">
-                          {patient.age} y/o
-                        </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          {patient.gender}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          {patient.total_sketches || 0}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
-                          {patient.personality || "—"}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          {/* This accesses the joined profile data */}
-                          {patient.guardian?.full_name || "Not assigned"}
+                          {user.email}
                         </td>
                         <td className="px-6 py-4">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              patient.status === "Active"
-                                ? "bg-green-100 text-green-700"
+                              user.role === "admin"
+                                ? "bg-purple-100 text-purple-700"
+                                : user.role === "therapist"
+                                ? "bg-blue-100 text-blue-700"
                                 : "bg-gray-100 text-gray-600"
                             }`}
                           >
-                            {patient.status}
+                            {user.role}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleEdit(patient)}
-                              title="Edit Patient"
+                              onClick={() => handleEdit(user)}
                               className="p-2 text-amber-600 hover:bg-amber-100 rounded-xl transition-all active:scale-95"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
                               onClick={() =>
-                                handleDelete(patient.id, patient.full_name)
+                                handleDelete(user.id, user.full_name)
                               }
-                              title="Delete Patient"
+                              title="Delete User"
                               className="p-2 text-red-600 hover:bg-red-100 rounded-xl transition-all active:scale-95"
                             >
                               <Trash2 size={18} />
@@ -385,10 +280,10 @@ export default function Patients() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={4}
                         className="px-6 py-10 text-center text-gray-500 italic"
                       >
-                        No patients match the selected criteria.
+                        No users found matching your criteria.
                       </td>
                     </tr>
                   )}
@@ -396,7 +291,7 @@ export default function Patients() {
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* Pagination - Matches Patients.tsx */}
             {totalPages > 1 && (
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
@@ -404,10 +299,9 @@ export default function Patients() {
                   <span className="font-semibold">{indexOfFirstItem + 1}</span>{" "}
                   to{" "}
                   <span className="font-semibold">
-                    {Math.min(indexOfLastItem, patients.length)}
+                    {Math.min(indexOfLastItem, users.length)}
                   </span>{" "}
-                  of <span className="font-semibold">{patients.length}</span>{" "}
-                  results
+                  of <span className="font-semibold">{users.length}</span> users
                 </div>
                 <div className="flex gap-2">
                   <button

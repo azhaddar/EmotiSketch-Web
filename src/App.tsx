@@ -10,7 +10,11 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import AddPatient from "./pages/AddPatient";
-import EditPatient from "./pages/EditPatient"; // Add this import
+import EditPatient from "./pages/EditPatient";
+import EditUser from "./pages/EditUser"; // Add this import
+import AddUser from "./pages/AddUser";
+// FIX 1: Ensure this matches your file name (UsersManagement vs UserManagement)
+import UsersManagement from "./pages/UserManagement";
 
 function App() {
   return (
@@ -24,7 +28,11 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="patients" element={<Patients />} />
           <Route path="patients/add" element={<AddPatient />} />
-          <Route path="patients/edit/:id" element={<EditPatient />} />;
+          {/* FIX 2: Removed the ";" that was at the end of this line */}
+          <Route path="patients/edit/:id" element={<EditPatient />} />
+          <Route path="users" element={<UsersManagement />} />
+          <Route path="users/add" element={<AddUser />} />
+          <Route path="users/edit/:id" element={<EditUser />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
