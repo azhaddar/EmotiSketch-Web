@@ -15,6 +15,7 @@ import EditUser from "./pages/EditUser"; // Add this import
 import AddUser from "./pages/AddUser";
 // FIX 1: Ensure this matches your file name (UsersManagement vs UserManagement)
 import UsersManagement from "./pages/UserManagement";
+import ChildrenProgress from "./pages/ChildrenProgress";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="patients" element={<Patients />} />
           <Route path="patients/add" element={<AddPatient />} />
           {/* FIX 2: Removed the ";" that was at the end of this line */}
+          <Route path="children" element={<ChildrenProgress />} />
           <Route path="patients/edit/:id" element={<EditPatient />} />
           <Route path="users" element={<UsersManagement />} />
           <Route path="users/add" element={<AddUser />} />
