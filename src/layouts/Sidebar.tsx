@@ -58,7 +58,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       visible: true,
     },
     {
-      name: "Patients",
+      name: "Children",
       path: "/dashboard/patients",
       icon: <Users size={20} />,
       // Visible to therapist and admin

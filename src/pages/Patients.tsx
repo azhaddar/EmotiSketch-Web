@@ -161,7 +161,7 @@ export default function Patients() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Patient Directory
+            Children Directory
           </h1>
           <p className="text-gray-600">
             Manage and monitor children's therapy progress.
@@ -172,7 +172,7 @@ export default function Patients() {
           className="flex items-center justify-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95"
         >
           <UserPlus size={20} />
-          <span>Add New Patient</span>
+          <span>Add New Children</span>
         </button>
       </div>
 
@@ -218,7 +218,7 @@ export default function Patients() {
                 {/* Status Filter */}
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-2 italic">
-                    Patient Status
+                    Children Status
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {["All", "Active", "Inactive"].map((status) => (
@@ -313,7 +313,7 @@ export default function Patients() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-600">
-                    <th className="px-6 py-4">Patient Name</th>
+                    <th className="px-6 py-4">Child Name</th>
                     <th className="px-6 py-4">Age</th>
                     <th className="px-6 py-4">Gender</th>
                     <th className="px-6 py-4">Total Sketch</th>

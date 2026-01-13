@@ -44,8 +44,8 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
-            {/* Search Bar */}
-            <div className="relative hidden md:block">
+            {/* Search Bar - COMMENTED OUT */}
+            {/* <div className="relative hidden md:block">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 size={18}
@@ -55,13 +55,13 @@ export default function DashboardLayout() {
                 placeholder="Search sketches..."
                 className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
               />
-            </div>
+            </div> */}
 
-            {/* Notification Bell */}
-            <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+            {/* Notification Bell - COMMENTED OUT */}
+            {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg">
               <Bell size={20} className="text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            </button> */}
           </div>
         </header>
 

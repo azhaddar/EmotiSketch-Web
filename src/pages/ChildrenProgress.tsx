@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Calendar, User, NotebookPen, ArrowRight, Loader2 } from "lucide-react";
+import { User, NotebookPen, ArrowRight, Loader2 } from "lucide-react";
 
 interface Child {
   id: string;

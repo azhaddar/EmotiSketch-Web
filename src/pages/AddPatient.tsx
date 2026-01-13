@@ -64,7 +64,7 @@ export default function AddPatient() {
         {/* Header - reduced padding from p-8 to p-5 */}
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <h1 className="text-xl font-bold text-gray-900 leading-tight">
-            Register New Patient
+            Register New Child
           </h1>
           <p className="text-xs text-gray-500">
             Fill in the details to start a new therapy profile.

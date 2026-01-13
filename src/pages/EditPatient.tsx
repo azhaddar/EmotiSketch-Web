@@ -99,7 +99,7 @@ export default function EditPatient() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <h1 className="text-xl font-bold text-gray-900 leading-tight">
-            Edit Patient Profile
+            Edit Child Profile
           </h1>
           <p className="text-xs text-gray-500">
             Update the child's information below.
