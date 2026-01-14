@@ -19,6 +19,10 @@ export default function Patients() {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
+  // New State for Role and Therapists List
+  const [userRole, setUserRole] = useState("");
+  const [therapists, setTherapists] = useState<any[]>([]);
+
   // Filter States
   const [statusFilter, setStatusFilter] = useState("All");
   const [genderFilter, setGenderFilter] = useState("All");
@@ -37,8 +41,6 @@ export default function Patients() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, statusFilter, genderFilter, ageFilter]);
 
-  // src/pages/Patients.tsx
-
   async function fetchPatients() {
     try {
       setLoading(true);
@@ -56,7 +58,24 @@ export default function Patients() {
         .eq("id", user.id)
         .single();
 
-      // 3. Build the query and JOIN the profiles table for the Guardian's name
+      const role = profile?.role || "";
+      setUserRole(role);
+
+      // 2a. If Admin, fetch the list of therapists for the dropdown
+      if (role === "admin") {
+        const { data: therapistList } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("role", "therapist")
+          .order("full_name", { ascending: true });
+
+        // Only update if we successfully got data
+        if (therapistList) {
+          setTherapists(therapistList);
+        }
+      }
+
+      // 3. Build the query
       let query = supabase
         .from("patients")
         .select(
@@ -70,7 +89,7 @@ export default function Patients() {
         .order("full_name", { ascending: true });
 
       // 4. ROLE FILTER: Only restrict by therapist_id if the user is NOT an admin
-      if (profile?.role !== "admin") {
+      if (role !== "admin") {
         query = query.eq("therapist_id", user.id);
       }
 
@@ -118,6 +137,32 @@ export default function Patients() {
     navigate(`/dashboard/patients/edit/${patient.id}`, {
       state: { patient },
     });
+  }
+
+  // Handle assigning a therapist (Admin Only)
+  async function handleAssignTherapist(
+    patientId: string,
+    newTherapistId: string
+  ) {
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ therapist_id: newTherapistId || null })
+        .eq("id", patientId);
+
+      if (error) throw error;
+
+      // Optimistically update local state to avoid full reload
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patientId ? { ...p, therapist_id: newTherapistId } : p
+        )
+      );
+
+      alert("Therapist assigned successfully!");
+    } catch (error: any) {
+      alert(`Error updating therapist: ${error.message}`);
+    }
   }
 
   // Delete Patient
@@ -320,6 +365,10 @@ export default function Patients() {
                     <th className="px-6 py-4">Personality</th>
                     <th className="px-6 py-4">Parent's Name</th>
                     <th className="px-6 py-4">Status</th>
+                    {/* NEW: Admin Only Column Header */}
+                    {userRole === "admin" && (
+                      <th className="px-6 py-4">Assign Therapist</th>
+                    )}
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -346,7 +395,6 @@ export default function Patients() {
                           {patient.personality || "—"}
                         </td>
                         <td className="px-6 py-4 text-gray-600">
-                          {/* This accesses the joined profile data */}
                           {patient.guardian?.full_name || "Not assigned"}
                         </td>
                         <td className="px-6 py-4">
@@ -360,6 +408,28 @@ export default function Patients() {
                             {patient.status}
                           </span>
                         </td>
+                        {/* NEW: Admin Only Dropdown */}
+                        {userRole === "admin" && (
+                          <td className="px-6 py-4">
+                            <select
+                              value={patient.therapist_id || ""}
+                              onChange={(e) =>
+                                handleAssignTherapist(
+                                  patient.id,
+                                  e.target.value
+                                )
+                              }
+                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-pink-500 focus:outline-none w-40"
+                            >
+                              <option value="">Unassigned</option>
+                              {therapists.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.full_name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -385,7 +455,7 @@ export default function Patients() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={userRole === "admin" ? 9 : 8}
                         className="px-6 py-10 text-center text-gray-500 italic"
                       >
                         No patients match the selected criteria.
