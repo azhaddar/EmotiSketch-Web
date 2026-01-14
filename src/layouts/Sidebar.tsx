@@ -6,6 +6,7 @@ import {
   LogOut,
   User,
   ShieldUser,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
@@ -63,6 +64,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: <Users size={20} />,
       // Visible to therapist and admin
       visible: role === "therapist" || role === "admin",
+    },
+    {
+      name: "Add Child",
+      path: "/dashboard/patients/add", // Reusing the existing page
+      icon: <UserPlus size={20} />,
+      visible: role === "user", // Only visible to Parents
     },
     {
       name: "Children Progress", // This is the "Patient Progress" you mentioned

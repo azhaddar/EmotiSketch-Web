@@ -33,9 +33,7 @@ const Register: React.FC = () => {
       setError(signUpError.message);
       setLoading(false);
     } else {
-      alert(
-        "Registration successful! Please check your email for verification."
-      );
+      alert("Registration successful!");
       navigate("/");
     }
   };

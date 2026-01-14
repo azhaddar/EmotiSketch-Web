@@ -41,16 +41,25 @@ export default function UsersManagement() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, roleFilter]);
 
-  async function handleDelete(userId: string, userName: string) {
-    // 1. Confirm with the admin before proceeding
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${userName}? This will remove their profile from the system.`
-    );
+  async function handleDelete(
+    userId: string,
+    userName: string,
+    userRole: string
+  ) {
+    // 1. Customized Warning Message
+    let warningMessage = `Are you sure you want to delete ${userName}?`;
 
+    if (userRole === "user") {
+      warningMessage += `\n\n⚠️ WARNING: This is a Parent account. Deleting them will PERMANENTLY DELETE all their registered children's data too.`;
+    } else if (userRole === "therapist") {
+      warningMessage += `\n\nℹ️ Note: This is a Therapist. Their patients will be set to "Unassigned" but will NOT be deleted.`;
+    }
+
+    const confirmed = window.confirm(warningMessage);
     if (!confirmed) return;
 
     try {
-      setLoading(true); // Show loading state while deleting
+      setLoading(true);
 
       // 2. Execute the delete command
       const { error } = await supabase
@@ -61,18 +70,9 @@ export default function UsersManagement() {
       if (error) throw error;
 
       alert("User profile deleted successfully!");
-
-      // 3. Refresh the list to reflect the changes
       fetchUsers();
     } catch (error: any) {
-      // Handle potential Foreign Key errors (e.g., if a therapist still has patients)
-      if (error.code === "23503") {
-        alert(
-          "Cannot delete this user: They are still assigned as a therapist or guardian to existing patients."
-        );
-      } else {
-        alert(`Error deleting user: ${error.message}`);
-      }
+      alert(`Error deleting user: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -266,8 +266,8 @@ export default function UsersManagement() {
                             </button>
                             <button
                               onClick={() =>
-                                handleDelete(user.id, user.full_name)
-                              }
+                                handleDelete(user.id, user.full_name, user.role)
+                              } // Pass role here
                               title="Delete User"
                               className="p-2 text-red-600 hover:bg-red-100 rounded-xl transition-all active:scale-95"
                             >

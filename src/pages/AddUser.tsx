@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
+// 1. Add createClient to imports
+import { createClient } from "@supabase/supabase-js";
+// We still import the main 'supabase' to check our current session if needed,
+// but we won't use it for the signUp call.
 import { supabase } from "../lib/supabaseClient";
 
 export default function AddUser() {
@@ -18,22 +22,33 @@ export default function AddUser() {
     setIsSubmitting(true);
 
     try {
-      // Create user in Supabase Auth
-      const { data, error: authError } = await supabase.auth.signUp({
+      // 2. Create a "Disposable" Client just for this request
+      // We access the environment variables directly here
+      const tempSupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false, // <--- CRITICAL: Don't save the new user's session
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        }
+      );
+
+      // 3. Use tempSupabase instead of the global 'supabase'
+      const { data, error: authError } = await tempSupabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             full_name: formData.full_name,
-            role: formData.role, // This assumes your trigger/function handles role metadata
+            role: formData.role,
           },
         },
       });
 
       if (authError) throw authError;
-
-      // Note: By default, Supabase creates a profile record via triggers.
-      // If you don't have a trigger, you may need to manually insert into 'profiles' here.
 
       alert("User account created successfully!");
       navigate("/dashboard/users");
@@ -46,7 +61,6 @@ export default function AddUser() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 flex flex-col h-full justify-center">
-      {/* Back Button */}
       <button
         onClick={() => navigate("/dashboard/users")}
         className="flex items-center gap-2 text-gray-500 hover:text-[#e13d7d] transition-colors mb-3 group w-fit"
@@ -59,7 +73,6 @@ export default function AddUser() {
       </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* Header */}
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <h1 className="text-xl font-bold text-gray-900 leading-tight">
             Create New User
@@ -69,7 +82,6 @@ export default function AddUser() {
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
