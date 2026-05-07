@@ -5,6 +5,8 @@ import {
   Settings,
   LogOut,
   User,
+  ShieldUser,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
@@ -20,8 +22,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const [full_name, setFullName] = useState<string>("User");
   const [email, setUserEmail] = useState<string>("");
-  // 1. Add state to store the user's role
-  const [role, setRole] = useState<string | null>(null);
+  const [role, setRole] = useState<string>(""); // Default to empty string
 
   useEffect(() => {
     const getProfileName = async () => {
@@ -32,7 +33,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       if (user) {
         setUserEmail(user.email ?? "");
 
-        // 2. Update select to include the "role" column
         const { data, error } = await supabase
           .from("profiles")
           .select("full_name, email, role")
@@ -40,8 +40,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           .single();
 
         if (data) {
+          console.log("Detected Role:", data.role); // Debugging
           setFullName(data.full_name || "User");
-          setRole(data.role); // Store the role (e.g., 'admin', 'therapist', 'user')
+          // Store role in lowercase to avoid "User" vs "user" bugs
+          setRole((data.role || "").toLowerCase());
         }
       }
     };
@@ -49,33 +51,44 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     getProfileName();
   }, []);
 
-  // 3. Define menu items with visibility logic
   const menuItems = [
     {
       name: "Dashboard",
       path: "/dashboard",
       icon: <Home size={20} />,
-      visible: true, // Always visible
+      visible: true,
     },
     {
-      name: "Patients",
+      name: "Children",
       path: "/dashboard/patients",
       icon: <Users size={20} />,
       // Visible to therapist and admin
       visible: role === "therapist" || role === "admin",
     },
     {
-      name: "Children Progress",
+      name: "Add Child",
+      path: "/dashboard/patients/add", // Reusing the existing page
+      icon: <UserPlus size={20} />,
+      visible: role === "user", // Only visible to Parents
+    },
+    {
+      name: "Children Progress", // This is the "Patient Progress" you mentioned
       path: "/dashboard/children",
       icon: <ChartNoAxesCombined size={20} />,
-      // Visible to parents (specifically "user" role) and admin
-      visible: role === "user" || role === "admin",
+      // FIX: Now visible to User (Parent), Therapist, AND Admin
+      visible: role === "user" || role === "therapist" || role === "admin",
+    },
+    {
+      name: "Users",
+      path: "/dashboard/users",
+      icon: <ShieldUser size={20} />,
+      visible: role === "admin",
     },
     {
       name: "Settings",
       path: "/dashboard/settings",
       icon: <Settings size={20} />,
-      visible: true, // Always visible
+      visible: true,
     },
   ];
 
@@ -112,9 +125,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               {full_name}
             </p>
             <p className="text-xs text-gray-500 truncate">{email}</p>
-            {/* Optional: Show role badge for clarity */}
             <p className="text-[10px] uppercase font-bold text-pink-500">
-              {role}
+              {role || "..."}
             </p>
           </div>
         </div>
@@ -122,7 +134,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {menuItems
-          .filter((item) => item.visible) // 4. Filter out items that shouldn't be visible
+          .filter((item) => item.visible)
           .map((item) => {
             const isActive = location.pathname === item.path;
             return (
