@@ -9,7 +9,6 @@ export default function AddPatient() {
 
   // State for logic
   const [currentUserRole, setCurrentUserRole] = useState("");
-  const [currentUserId, setCurrentUserId] = useState(""); // Track ID for default value
   const [guardians, setGuardians] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
@@ -32,8 +31,6 @@ export default function AddPatient() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      setCurrentUserId(user.id);
-
       // 2. Get their profile/role
       const { data: profile } = await supabase
         .from("profiles")
@@ -44,15 +41,15 @@ export default function AddPatient() {
       const role = profile?.role || "user";
       setCurrentUserRole(role);
 
-      // 3. Logic Branch:
+      // 3. Logic Branch (Data Only):
       if (role === "user") {
-        // If Parent: Set their ID immediately and put them in the "list" so the dropdown has an option to show
+        // If Parent: Set their ID immediately and limit the list to just them
         setFormData((prev) => ({ ...prev, guardian_id: user.id }));
         setGuardians([
           {
             id: user.id,
-            full_name: profile.full_name || "Me",
-            email: profile.email,
+            full_name: profile?.full_name || "Me",
+            email: profile?.email,
           },
         ]);
       } else {
@@ -94,7 +91,7 @@ export default function AddPatient() {
         total_sketches: 0,
       };
 
-      // Role logic for therapist_id
+      // Role logic for therapist_id (Backend consistency)
       if (currentUserRole === "therapist") {
         payload.therapist_id = user.id;
       } else {
@@ -107,12 +104,8 @@ export default function AddPatient() {
 
       alert("Child profile added successfully!");
 
-      // Redirect based on role
-      if (currentUserRole === "user") {
-        navigate("/dashboard/children");
-      } else {
-        navigate("/dashboard/patients");
-      }
+      // Go back to previous page
+      navigate(-1);
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -123,37 +116,23 @@ export default function AddPatient() {
   return (
     <div className="max-w-3xl mx-auto p-4 flex flex-col h-full justify-center">
       <button
-        onClick={() =>
-          navigate(
-            currentUserRole === "user"
-              ? "/dashboard/children"
-              : "/dashboard/patients"
-          )
-        }
+        onClick={() => navigate(-1)} // Generic "Go Back" action
         className="flex items-center gap-2 text-gray-500 hover:text-[#e13d7d] transition-colors mb-3 group w-fit"
       >
         <ArrowLeft
           size={18}
           className="group-hover:-translate-x-1 transition-transform"
         />
-        <span className="text-sm font-medium">
-          {currentUserRole === "user"
-            ? "Back to My Children"
-            : "Back to Directory"}
-        </span>
+        <span className="text-sm font-medium">Back</span>
       </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <h1 className="text-xl font-bold text-gray-900 leading-tight">
-            {currentUserRole === "user"
-              ? "Add My Child"
-              : "Register New Patient"}
+            Register New Child
           </h1>
           <p className="text-xs text-gray-500">
-            {currentUserRole === "user"
-              ? "Create a profile for your child to start their emotional journey."
-              : "Fill in the details to start a new therapy profile."}
+            Fill in the details to create a new profile.
           </p>
         </div>
 
@@ -209,25 +188,29 @@ export default function AddPatient() {
             </div>
 
             {/* ASSIGN PARENT DROPDOWN */}
-            {/* Logic: Always show, but disable if user is a parent */}
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
                 Assign Parent (Guardian)
               </label>
               <select
-                className={`w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none bg-white text-sm ${
-                  currentUserRole === "user" ? "bg-gray-100 text-gray-500" : ""
+                // ADDED: Logic to change background color if parent
+                className={`w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none text-sm ${
+                  currentUserRole === "user"
+                    ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                    : "bg-white"
                 }`}
                 value={formData.guardian_id}
                 onChange={(e) =>
                   setFormData({ ...formData, guardian_id: e.target.value })
                 }
-                disabled={currentUserRole === "user"} // DISABLE if parent
+                // ADDED: Logic to disable if parent
+                disabled={currentUserRole === "user"}
               >
-                {/* If parent, show only their option. If admin/therapist, show placeholder */}
+                {/* Standard placeholder */}
                 {currentUserRole !== "user" && (
-                  <option value="">-- Select a Parent (Optional) --</option>
+                  <option value="">-- Select a Parent --</option>
                 )}
+
                 {guardians.map((guardian) => (
                   <option key={guardian.id} value={guardian.id}>
                     {guardian.full_name} ({guardian.email})

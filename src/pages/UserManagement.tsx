@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
-  Plus,
   Filter,
   Loader2,
   Edit2,
@@ -61,15 +60,13 @@ export default function UsersManagement() {
     try {
       setLoading(true);
 
-      // 2. Execute the delete command
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
+      const { error } = await supabase.functions.invoke("delete-user", {
+        body: { userId },
+      });
 
       if (error) throw error;
 
-      alert("User profile deleted successfully!");
+      alert("User deleted successfully!");
       fetchUsers();
     } catch (error: any) {
       alert(`Error deleting user: ${error.message}`);
