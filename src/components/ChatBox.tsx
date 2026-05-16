@@ -776,15 +776,29 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
                           isMine ? "bg-[#e13d7d] text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"
                         }`}>
                           <p>{m.content}</p>
-                          <p className={`text-[10px] mt-0.5 ${isMine ? "text-pink-200" : "text-gray-400"} text-right`}>
-                            {timeLabel(m.created_at)}
-                          </p>
+                          <div className="flex items-center justify-end gap-1 mt-0.5">
+                            <span className={`text-[10px] ${isMine ? "text-pink-200" : "text-gray-400"}`}>
+                              {timeLabel(m.created_at)}
+                            </span>
+                            {isMine && (
+                              <span className={`text-[10px] font-bold leading-none ${m.read_at ? "text-blue-300" : "text-pink-200/60"}`}>
+                                {m.read_at ? "✓✓" : "✓"}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
 
                       {/* Timestamp for attachment-only messages */}
                       {att && !m.content && (
-                        <p className="text-[10px] text-gray-400">{timeLabel(m.created_at)}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[10px] text-gray-400">{timeLabel(m.created_at)}</span>
+                          {isMine && (
+                            <span className={`text-[10px] font-bold leading-none ${m.read_at ? "text-blue-400" : "text-gray-300"}`}>
+                              {m.read_at ? "✓✓" : "✓"}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
