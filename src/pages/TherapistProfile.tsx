@@ -275,76 +275,93 @@ export default function TherapistProfile() {
         </div>
       )}
 
-      {/* ── Professional Appointment ─────────────────────────────────────────── */}
-      <Section title="Professional Appointment">
-        {data.professional_title ? (
-          <p className="text-sm text-gray-700">
-            {data.professional_title}
-            {data.years_of_experience !== "" && (
-              <span className="text-gray-400 ml-2">· {data.years_of_experience} yrs experience</span>
-            )}
-          </p>
-        ) : (
-          <p className="text-sm text-gray-400 italic">Not filled in yet</p>
-        )}
-      </Section>
+      {/* ── Sections grid ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4">
 
-      {/* ── Academic Qualifications ──────────────────────────────────────────── */}
-      <Section title="Academic Qualification">
-        {qualifications.length > 0 ? (
-          <div className="space-y-2">
-            {qualifications.map((q, i) => (
-              <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
-                <p className="text-sm font-medium text-gray-700 uppercase tracking-wide">{q}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 italic">Not filled in yet</p>
-        )}
-      </Section>
-
-      {/* ── Registered Body & License ────────────────────────────────────────── */}
-      <Section title="Professional Registration">
-        {data.registered_body || data.license_number ? (
-          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700 uppercase tracking-wide">
-              {data.registered_body || "—"}
-            </p>
-            {data.license_number && (
-              <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
-                {data.license_number}
-              </span>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 italic">Not filled in yet</p>
-        )}
-      </Section>
-
-      {/* ── Bio ─────────────────────────────────────────────────────────────── */}
-      {(data.bio || editing) && (
-        <Section title="About">
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-            {data.bio || <span className="text-gray-400 italic">Not filled in yet</span>}
-          </p>
+        {/* Professional Appointment */}
+        <Section title="Professional Appointment">
+          {data.professional_title ? (
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm font-semibold text-gray-800">{data.professional_title}</p>
+              {data.years_of_experience !== "" && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+                  <Clock size={11} />
+                  {data.years_of_experience} year{Number(data.years_of_experience) !== 1 ? "s" : ""} experience
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Not filled in yet</p>
+          )}
         </Section>
-      )}
+
+        {/* Academic Qualifications */}
+        <Section title="Academic Qualification">
+          {qualifications.length > 0 ? (
+            <div className="space-y-2">
+              {qualifications.map((q, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="mt-1 w-5 h-5 rounded-full bg-pink-100 text-[#e13d7d] text-[10px] font-black flex items-center justify-center flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm font-medium text-gray-700 leading-snug pt-0.5">{q}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Not filled in yet</p>
+          )}
+        </Section>
+
+        {/* Professional Registration */}
+        <Section title="Professional Registration">
+          {data.registered_body || data.license_number ? (
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">Registered Body</p>
+                <p className="text-sm font-semibold text-gray-800">{data.registered_body || "—"}</p>
+              </div>
+              {data.license_number && (
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">License No.</p>
+                  <span className="inline-block text-sm font-bold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                    {data.license_number}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Not filled in yet</p>
+          )}
+        </Section>
+
+        {/* About / Bio */}
+        {(data.bio || editing) && (
+          <Section title="About">
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+              {data.bio || <span className="text-gray-400 italic">Not filled in yet</span>}
+            </p>
+          </Section>
+        )}
+
+      </div>
     </div>
   );
 }
 
-// ── Section wrapper ───────────────────────────────────────────────────────────
+// ── Section card wrapper ──────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-xs font-black uppercase tracking-widest text-gray-800 whitespace-nowrap">
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+        <div className="w-1 h-4 rounded-full bg-[#e13d7d]" />
+        <h2 className="text-xs font-black uppercase tracking-widest text-gray-600">
           {title}
         </h2>
-        <div className="flex-1 h-px bg-gray-200" />
       </div>
-      {children}
+      <div className="px-5 py-4">
+        {children}
+      </div>
     </div>
   );
 }
