@@ -312,7 +312,8 @@ export default function ChildProgressDetail() {
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string>("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId]         = useState<string | null>(null);
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const [selectedSketch, setSelectedSketch] = useState<Sketch | null>(null);
   const [noteText, setNoteText] = useState<string>("");
   const [savingNote, setSavingNote] = useState(false);
@@ -822,14 +823,24 @@ export default function ChildProgressDetail() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-            All Sessions
+            {showAllSessions ? "All Sessions" : "Recent Sessions"}
             <span className="ml-2 font-normal text-gray-400 normal-case">({sketches.length})</span>
           </h2>
-          {role === "admin" && (
-            <span className="text-xs text-red-400 font-medium flex items-center gap-1">
-              <Trash2 size={12} /> Admin can delete
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {role === "admin" && (
+              <span className="text-xs text-red-400 font-medium flex items-center gap-1">
+                <Trash2 size={12} /> Admin can delete
+              </span>
+            )}
+            {sketches.length > 3 && (
+              <button
+                onClick={() => setShowAllSessions(v => !v)}
+                className="text-xs font-bold text-[#e13d7d] hover:underline"
+              >
+                {showAllSessions ? "Show Less" : `See All (${sketches.length})`}
+              </button>
+            )}
+          </div>
         </div>
 
         {sketches.length === 0 ? (
@@ -839,10 +850,11 @@ export default function ChildProgressDetail() {
             <p className="text-xs mt-1">Sessions will appear here once the child submits drawings.</p>
           </div>
         ) : (
+          <>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sketches.map((sketch, i) => {
+            {(showAllSessions ? sketches : sketches.slice(0, 3)).map((sketch, i) => {
               const e = EMOTIONS[sketch.emotion];
-              const sessionNum = sketches.length - i;
+              const sessionNum = sketches.length - sketches.indexOf(sketch);
               const fallbackDesc = `A ${e?.label.toLowerCase()} emotion was detected in this drawing session. Tap to see the full breakdown.`;
               return (
                 <div
@@ -934,6 +946,17 @@ export default function ChildProgressDetail() {
               );
             })}
           </div>
+          {!showAllSessions && sketches.length > 3 && (
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => setShowAllSessions(true)}
+                className="w-full py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:border-[#e13d7d] hover:text-[#e13d7d] transition-colors bg-gray-50 hover:bg-pink-50"
+              >
+                See All {sketches.length} Sessions
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 

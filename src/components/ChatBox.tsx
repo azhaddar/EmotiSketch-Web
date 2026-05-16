@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
-  X, ChevronLeft, Send, MessageCircle, Plus,
-  ImageIcon, BarChart2, FileText, XCircle,
+  X, ChevronLeft, Send, MessageSquare, Paperclip,
+  PenLine, BarChart2, TrendingUp, X as XIcon,
+  AtSign, User, Users,
 } from "lucide-react";
 
 // ── Emotion config ──────────────────────────────────────────────────────────
@@ -18,10 +19,11 @@ function emojiFor(e?: string | null) { return EMOTIONS[e ?? ""]?.emoji ?? "🎨"
 
 function computeScores(s: Record<string, unknown>): Record<string, number> | null {
   const sc = s.scores as Record<string, number> | null | undefined;
-  const h  = (sc?.happy   ?? s.happy   ?? 0) as number;
-  const sa = (sc?.sad     ?? s.sad     ?? 0) as number;
-  const an = (sc?.angry   ?? s.angry   ?? 0) as number;
-  const ax = (sc?.anxious ?? s.anxious ?? 0) as number;
+  if (!sc) return null;
+  const h  = sc.happy   ?? 0;
+  const sa = sc.sad     ?? 0;
+  const an = sc.angry   ?? 0;
+  const ax = sc.anxious ?? 0;
   if (h + sa + an + ax === 0) return null;
   const max = Math.max(h, sa, an, ax);
   const norm = (v: number) => max <= 1 ? Math.round(v * 100) : Math.round(v);
@@ -365,7 +367,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
     } else if (tab === "result") {
       const { data } = await supabase
         .from("sketches")
-        .select("id, image_url, emotion, scores, happy, sad, angry, anxious, created_at, patient_id")
+        .select("id, image_url, emotion, scores, created_at, patient_id")
         .in("patient_id", active.patientIds)
         .order("created_at", { ascending: true });
       const withNum = ((data ?? []) as SketchRaw[]).map((s, i) => ({ ...s, sessionNum: i + 1 })).reverse();
@@ -427,10 +429,10 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
 
   if (!open) return null;
 
-  const PICKER_TABS: { key: PickerTab; label: string; icon: typeof ImageIcon }[] = [
-    { key: "drawing", label: "Drawing", icon: ImageIcon },
+  const PICKER_TABS: { key: PickerTab; label: string; icon: typeof PenLine }[] = [
+    { key: "drawing", label: "Drawing", icon: PenLine },
     { key: "result",  label: "Result",  icon: BarChart2 },
-    { key: "graph",   label: "Graph",   icon: FileText },
+    { key: "graph",   label: "Graph",   icon: TrendingUp },
   ];
 
   return (
@@ -497,7 +499,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
               ) : pickerTab === "drawing" ? (
                 pickerSketches.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-center px-6">
-                    <ImageIcon size={28} className="mb-2 opacity-30" />
+                    <PenLine size={28} className="mb-2 opacity-30" />
                     <p className="text-xs">No drawings yet</p>
                   </div>
                 ) : (
@@ -522,8 +524,8 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
                             <p className="text-xs text-purple-500 font-medium">{pName}</p>
                             <p className="text-[11px] text-gray-400">{timeLabel(s.created_at)}</p>
                           </div>
-                          <span className="text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
-                            Mention
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
+                            <AtSign size={10} />Mention
                           </span>
                         </button>
                       );
@@ -535,7 +537,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
                 pickerSessions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-center px-6">
                     <BarChart2 size={28} className="mb-2 opacity-30" />
-                    <p className="text-xs">No session results yet</p>
+                    <p className="text-xs font-medium">No session results yet</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-50">
@@ -569,8 +571,8 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
                             <p className="text-xs text-purple-500 font-medium">{pName}</p>
                             <p className="text-[11px] text-gray-400">{dateLabel(s.created_at)}</p>
                           </div>
-                          <span className="text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
-                            Mention
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
+                            <AtSign size={10} />Mention
                           </span>
                         </button>
                       );
@@ -581,8 +583,8 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
               ) : /* graph */ (
                 Object.keys(pickerTimeline).length === 0 || Object.values(pickerTimeline).every(v => v.length === 0) ? (
                   <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-center px-6">
-                    <FileText size={28} className="mb-2 opacity-30" />
-                    <p className="text-xs">No data yet</p>
+                    <TrendingUp size={28} className="mb-2 opacity-30" />
+                    <p className="text-xs font-medium">No data yet</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-50">
@@ -606,8 +608,8 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
                             </div>
                             <p className="text-[11px] text-gray-400">{pts.length} sessions</p>
                           </div>
-                          <span className="text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
-                            Share
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-[#e13d7d] border border-[#e13d7d] rounded-full px-2 py-0.5 flex-shrink-0">
+                            <Send size={10} />Share
                           </span>
                         </button>
                       );
@@ -627,7 +629,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
             </div>
           ) : contacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 px-6 text-center">
-              <MessageCircle size={36} className="mb-3 opacity-30" />
+              <MessageSquare size={36} className="mb-3 opacity-30" />
               <p className="font-medium text-gray-500 text-sm">No conversations yet</p>
               <p className="text-xs mt-1">
                 {myRole === "therapist"
@@ -640,8 +642,8 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
               {contacts.map(c => (
                 <button key={c.convId} onClick={() => openConversation(c)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
-                    {c.name.charAt(0).toUpperCase()}
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <User size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
@@ -808,7 +810,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
               <p className="text-xs text-gray-700 truncate">{pendingAttachment.title}</p>
             </div>
             <button onClick={() => setPendingAttachment(null)}>
-              <XCircle size={16} className="text-gray-400 hover:text-gray-600" />
+              <XIcon size={16} className="text-gray-400 hover:text-gray-600" />
             </button>
           </div>
         </div>
@@ -819,7 +821,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
         <div className="flex items-center gap-2 px-3 py-3 border-t border-gray-100 flex-shrink-0">
           <button onClick={openPicker}
             className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-pink-300 hover:text-[#e13d7d] transition-colors flex-shrink-0">
-            <Plus size={16} />
+            <Paperclip size={16} />
           </button>
           <input
             ref={inputRef} type="text" value={input}

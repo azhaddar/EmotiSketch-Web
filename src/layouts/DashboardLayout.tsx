@@ -10,6 +10,7 @@ export default function DashboardLayout() {
   const [chatOpen, setChatOpen]             = useState(false);
   const [notifOpen, setNotifOpen]           = useState(false);
   const [unreadCount, setUnreadCount]       = useState(0);
+  const [notifCount, setNotifCount]         = useState(0);
 
   const chatRef  = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -76,8 +77,13 @@ export default function DashboardLayout() {
                 aria-label="Notifications"
               >
                 <Bell size={20} className="text-gray-600" />
+                {notifCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#e13d7d] text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    {notifCount > 9 ? "9+" : notifCount}
+                  </span>
+                )}
               </button>
-              <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+              <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} onCountChange={setNotifCount} />
             </div>
 
             {/* Chat Icon */}
