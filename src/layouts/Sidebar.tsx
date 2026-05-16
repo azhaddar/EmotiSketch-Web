@@ -8,6 +8,7 @@ import {
   ShieldUser,
   UserPlus,
   Users,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import React, { useEffect, useState } from "react";
@@ -79,6 +80,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       visible: role === "user" || role === "therapist" || role === "admin",
     },
     {
+      name: "Analytics",
+      path: "/dashboard/analytics",
+      icon: <BarChart3 size={20} />,
+      visible: role === "therapist" || role === "admin",
+    },
+    {
       name: "Users",
       path: "/dashboard/users",
       icon: <ShieldUser size={20} />,
@@ -92,8 +99,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      await supabase.auth.signOut();
       navigate("/");
     }
   };

@@ -17,6 +17,8 @@ import AddUser from "./pages/AddUser";
 import UsersManagement from "./pages/UserManagement";
 import ChildrenProgress from "./pages/ChildrenProgress";
 import ChildProgressDetail from "./pages/ChildProgressDetail";
+import TherapistAnalytics from "./pages/TherapistAnalytics";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -34,9 +36,11 @@ function App() {
           <Route path="children" element={<ChildrenProgress />} />
           <Route path="children/:id" element={<ChildProgressDetail />} />
           <Route path="patients/edit/:id" element={<EditPatient />} />
+          <Route path="analytics" element={<TherapistAnalytics />} />
           <Route path="users" element={<UsersManagement />} />
           <Route path="users/add" element={<AddUser />} />
           <Route path="users/edit/:id" element={<EditUser />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

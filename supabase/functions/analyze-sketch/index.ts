@@ -157,8 +157,7 @@ Where X is an integer and the four values sum to exactly 100. No explanation, no
 
 const INVALID_MESSAGES: Record<string, string> = {
   self: "That doesn't look like a drawing of yourself! 🎨\n\nTry drawing YOU — your face, your body, or how you feel inside. It doesn't have to be perfect!",
-  house:
-    "That doesn't look like a drawing of a house! 🏠\n\nTry drawing your home — add walls, a roof, windows, and a door. Make it yours!",
+  house: "That doesn't look like a drawing of a house! 🏠\n\nTry drawing your home — add walls, a roof, windows, and a door. Make it yours!",
 };
 
 serve(async (req: Request) => {
@@ -172,20 +171,16 @@ serve(async (req: Request) => {
     if (!imageBase64) {
       return new Response(
         JSON.stringify({ error: "imageBase64 is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const systemPrompt =
-      promptType === "house" ? SYSTEM_PROMPT_HOUSE : SYSTEM_PROMPT_SELF;
-    const userInstruction =
-      promptType === "house"
-        ? "First validate, then analyze this child's house drawing using the HTP framework. Return only the required format."
-        : "First validate, then analyze this child's self-portrait using the DAP framework. Return only the required format.";
+    const systemPrompt = promptType === "house" ? SYSTEM_PROMPT_HOUSE : SYSTEM_PROMPT_SELF;
+    const userInstruction = promptType === "house"
+      ? "First validate, then analyze this child's house drawing using the HTP framework. Return only the required format."
+      : "First validate, then analyze this child's self-portrait using the DAP framework. Return only the required format.";
 
+    // ── Call 1: Emotion scoring ──────────────────────────────────────────────
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 100,
@@ -195,43 +190,25 @@ serve(async (req: Request) => {
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/jpeg",
-                data: imageBase64,
-              },
-            },
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
             { type: "text", text: userInstruction },
           ],
         },
       ],
     });
 
-    const raw = (response.content[0] as { text: string }).text
-      .trim()
-      .toLowerCase();
+    const raw = (response.content[0] as { text: string }).text.trim().toLowerCase();
 
-    // Check for invalid drawing
     if (raw.includes("valid:false") || raw === "false") {
       const type = promptType === "house" ? "house" : "self";
       return new Response(
         JSON.stringify({ valid: false, message: INVALID_MESSAGES[type] }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Parse scores
-    const scores: Record<string, number> = {
-      happy: 0,
-      sad: 0,
-      angry: 0,
-      anxious: 0,
-    };
+    const scores: Record<string, number> = { happy: 0, sad: 0, angry: 0, anxious: 0 };
     let parseOk = false;
     const matches = raw.matchAll(/(\w+):\s*(\d+)/g);
     for (const m of matches) {
@@ -244,95 +221,120 @@ serve(async (req: Request) => {
 
     const total = Object.values(scores).reduce((s, v) => s + v, 0);
     if (total > 0 && total !== 100) {
-      for (const k of VALID_EMOTIONS)
-        scores[k] = Math.round((scores[k] / total) * 100);
+      for (const k of VALID_EMOTIONS) scores[k] = Math.round((scores[k] / total) * 100);
     }
 
     const emotion: Emotion = parseOk
-      ? (VALID_EMOTIONS.reduce((a, b) =>
-          scores[a] >= scores[b] ? a : b,
-        ) as Emotion)
+      ? (VALID_EMOTIONS.reduce((a, b) => scores[a] >= scores[b] ? a : b) as Emotion)
       : "happy";
 
-    // Second call: generate therapist message (text-only, fast)
-    const drawingType =
-      promptType === "house" ? "house drawing" : "self-portrait";
-    const scoresSummary = VALID_EMOTIONS.map((e) => `${e}: ${scores[e]}%`).join(
-      ", ",
-    );
-    const preMoodLine = preMood
-      ? `\n- The child said they felt "${preMood}" before drawing.`
+    // ── Call 2: Therapist message + HTP clinical features ────────────────────
+    const drawingType = promptType === "house" ? "house drawing" : "self-portrait";
+    const scoresSummary = VALID_EMOTIONS.map((e) => `${e}: ${scores[e]}%`).join(", ");
+    const preMoodLine = preMood ? `\nThe child said they felt "${preMood}" before drawing.` : "";
+    const contrastNote = preMood && preMood !== emotion
+      ? `The child said they felt "${preMood}" before drawing but the drawing shows "${emotion}". Gently acknowledge this difference and reassure them it is normal.`
       : "";
-    const contrastNote =
-      preMood && preMood !== emotion
-        ? `Gently acknowledge that they said they felt "${preMood}" before drawing, but the drawing shows "${emotion}". Reassure them this is completely normal.`
-        : "";
 
     let therapistMessage = "";
-    try {
-      const isPositive = emotion === "happy";
-      const sentence2 = isPositive
-        ? `Tell the child you can see how happy and wonderful they feel, and cheer them on with excitement.`
-        : `Comfort the child warmly. Tell them it is completely okay to feel ${emotion} and that the people around them love them very much.`;
-      const sentence3 = `Tell the child you are proud of them for sharing their feelings through drawing and encourage them to keep drawing.`;
+    let htpFeatures: Array<{
+      category: string;
+      observation: string;
+      interpretation: string;
+      severity: number;
+    }> | null = null;
 
-      const msgResponse = await client.messages.create({
+    try {
+      const combinedResponse = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 180,
-        temperature: 0.6,
-        system: `You are a kind and caring child therapist talking directly to a young child aged 5 to 12. You always respond in one plain paragraph. You never use bullet points, numbered lists, labels, or headings. You only use commas and full stops as punctuation. You never write dashes, em-dashes, en-dashes, or hyphens used as punctuation.`,
+        max_tokens: 700,
+        temperature: 0.5,
+        system: `You are a pediatric art therapist and clinical child psychologist. Given a child's drawing and its emotion scores, produce two outputs in a single valid JSON object. Respond with JSON only — no markdown fences, no explanation outside the JSON.`,
         messages: [
           {
             role: "user",
-            content: `A child just finished a ${drawingType} and the drawing shows the emotion: ${emotion}.
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
+              {
+                type: "text",
+                text: `Drawing type: ${drawingType}
+Dominant emotion: ${emotion}
 Scores: ${scoresSummary}${preMoodLine}
-${contrastNote ? contrastNote + "\n" : ""}
-Write one short paragraph of exactly 3 sentences directly to the child using simple words a 6 year old understands. The paragraph must flow naturally as one piece of text with no labels or breaks.
+${contrastNote}
 
-Cover these 3 things in order inside the paragraph: first, explain what you noticed in the drawing that shows the "${emotion}" feeling by mentioning simple things like the colors used, how the lines look, or how the person or house appears. Second, ${sentence2.toLowerCase()} Third, ${sentence3.toLowerCase()}
+Return ONLY this JSON (no markdown, no extra text outside the braces):
+{
+  "therapistMessage": "<3 sentences, simple words a 6-year-old understands, speak directly to the child, mention specific things you see in the drawing such as colors or shapes, be warm and encouraging, use only commas and full stops as punctuation>",
+  "htpFeatures": [
+    {
+      "category": "<must be one of: Proportion and Scale, Placement and Orientation, Line Quality, Omissions and Additions>",
+      "observation": "<one specific visual detail you can actually see in this drawing>",
+      "interpretation": "<clinical psychological meaning in one short sentence>",
+      "severity": <integer 1 to 10>
+    }
+  ]
+}
 
-Output the paragraph only. No labels. No bullet points. No numbered list. No line breaks between sentences. Only commas and full stops as punctuation.`,
+Rules:
+- therapistMessage: exactly 3 sentences, no bullet points, no line breaks, no dashes
+- htpFeatures: 3 to 5 entries covering the most clinically significant observations
+- severity scale: 1-3 = typical/normal for age, 4-6 = noteworthy, 7-10 = significant clinical concern
+- Base htpFeatures observations only on what is visually present in the drawing`,
+              },
+            ],
           },
         ],
       });
 
-      therapistMessage = (msgResponse.content[0] as { text: string }).text
-        .trim()
+      const rawCombined = (combinedResponse.content[0] as { text: string }).text.trim();
+
+      // Strip markdown fences if present
+      const cleaned = rawCombined
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+
+      const parsed = JSON.parse(cleaned);
+
+      therapistMessage = (parsed.therapistMessage ?? "")
         .replace(/—/g, ",")
         .replace(/–/g, ",")
         .replace(/--/g, ",")
         .replace(/^\s*[-*•]\s+/gm, "")
-        .replace(/^\s*\d+\.\s+/gm, "")
-        .replace(/^(Sentence \d+:?\s*)/gim, "")
         .replace(/\n+/g, " ")
         .trim();
+
+      // Validate htpFeatures structure
+      if (Array.isArray(parsed.htpFeatures)) {
+        htpFeatures = parsed.htpFeatures
+          .filter((f: any) =>
+            typeof f.category === "string" &&
+            typeof f.observation === "string" &&
+            typeof f.interpretation === "string" &&
+            typeof f.severity === "number"
+          )
+          .map((f: any) => ({
+            category: f.category,
+            observation: f.observation,
+            interpretation: f.interpretation,
+            severity: Math.min(10, Math.max(1, Math.round(f.severity))),
+          }));
+      }
     } catch (_) {
-      // Non-critical - return without message if this call fails
+      // Non-critical — return without message/features if this call fails
     }
 
     return new Response(
-      JSON.stringify({ valid: true, emotion, scores, therapistMessage }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ valid: true, emotion, scores, therapistMessage, htpFeatures }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
     console.error("analyze-sketch error:", err.message);
-    const fallback =
-      VALID_EMOTIONS[Math.floor(Math.random() * VALID_EMOTIONS.length)];
+    const fallback = VALID_EMOTIONS[Math.floor(Math.random() * VALID_EMOTIONS.length)];
     return new Response(
-      JSON.stringify({
-        valid: true,
-        emotion: fallback,
-        scores: null,
-        fallback: true,
-        error: err.message,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ valid: true, emotion: fallback, scores: null, htpFeatures: null, fallback: true, error: err.message }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import {
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine,
+} from "recharts";
+import {
   ArrowLeft,
   Calendar,
   NotebookPen,
@@ -10,7 +14,11 @@ import {
   Loader2,
   Sparkles,
   Clock,
+  Trash2,
+  X,
+  ZoomIn,
 } from "lucide-react";
+import { EmotionIcon } from "../components/EmotionIcon";
 
 interface Patient {
   id: string;
@@ -32,13 +40,29 @@ interface Sketch {
   emotion: "happy" | "sad" | "angry" | "anxious";
   created_at: string;
   notes?: string;
+  image_url?: string | null;
+  score?: number | null;
+  analysis?: string | null;
+  therapist_message?: string | null;
+  htp_features?: Array<{
+    category: string;
+    observation: string;
+    interpretation: string;
+    severity: number;
+  }> | null;
+  happy?: number | null;
+  sad?: number | null;
+  angry?: number | null;
+  anxious?: number | null;
+  scores?: Record<string, number> | null;
+  [key: string]: unknown;
 }
 
-const EMOTIONS: Record<string, { label: string; color: string; bg: string; text: string; emoji: string; ring: string }> = {
-  happy:   { label: "Happy",   color: "#F59E0B", bg: "bg-amber-100",  text: "text-amber-700",  emoji: "😊", ring: "ring-amber-300" },
-  sad:     { label: "Sad",     color: "#3B82F6", bg: "bg-blue-100",   text: "text-blue-700",   emoji: "😢", ring: "ring-blue-300"  },
-  angry:   { label: "Angry",   color: "#EF4444", bg: "bg-red-100",    text: "text-red-700",    emoji: "😠", ring: "ring-red-300"   },
-  anxious: { label: "Anxious", color: "#8B5CF6", bg: "bg-purple-100", text: "text-purple-700", emoji: "😰", ring: "ring-purple-300"},
+const EMOTIONS: Record<string, { label: string; color: string; bg: string; text: string; ring: string }> = {
+  happy:   { label: "Happy",   color: "#F59E0B", bg: "bg-amber-100",  text: "text-amber-700",  ring: "ring-amber-300"  },
+  sad:     { label: "Sad",     color: "#3B82F6", bg: "bg-blue-100",   text: "text-blue-700",   ring: "ring-blue-300"   },
+  angry:   { label: "Angry",   color: "#EF4444", bg: "bg-red-100",    text: "text-red-700",    ring: "ring-red-300"    },
+  anxious: { label: "Anxious", color: "#8B5CF6", bg: "bg-purple-100", text: "text-purple-700", ring: "ring-purple-300" },
 };
 
 // ── Donut Chart ─────────────────────────────────────────────────────────────
@@ -167,8 +191,9 @@ function EmotionBadge({ emotion }: { emotion: string }) {
   const e = EMOTIONS[emotion];
   if (!e) return null;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${e.bg} ${e.text}`}>
-      <span>{e.emoji}</span> {e.label}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${e.bg} ${e.text}`}>
+      <EmotionIcon emotion={emotion} size={14} />
+      {e.label}
     </span>
   );
 }
@@ -284,6 +309,9 @@ export default function ChildProgressDetail() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string>("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedSketch, setSelectedSketch] = useState<Sketch | null>(null);
 
   useEffect(() => {
     if (id) fetchData(id);
@@ -292,6 +320,13 @@ export default function ChildProgressDetail() {
   async function fetchData(patientId: string) {
     try {
       setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles").select("role").eq("id", user.id).single();
+        setRole((prof?.role ?? "").toLowerCase());
+      }
 
       const { data: patientData, error: patientError } = await supabase
         .from("patients")
@@ -304,7 +339,7 @@ export default function ChildProgressDetail() {
 
       const { data: sketchData } = await supabase
         .from("sketches")
-        .select("id, patient_id, emotion, created_at, notes")
+        .select("*")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false });
 
@@ -313,6 +348,32 @@ export default function ChildProgressDetail() {
       console.error("Error loading child details:", err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function deleteSketch(sketch: Sketch) {
+    if (!window.confirm(`Delete this ${sketch.emotion} session from ${new Date(sketch.created_at).toLocaleDateString("en-MY")}? This cannot be undone.`)) return;
+
+    setDeletingId(sketch.id);
+    try {
+      // Remove image from storage if exists
+      if (sketch.image_url) {
+        const parts = sketch.image_url.split("/sketch-images/");
+        if (parts.length === 2) {
+          await supabase.storage.from("sketch-images").remove([parts[1]]);
+        }
+      }
+      // Delete DB record
+      const { error } = await supabase.from("sketches").delete().eq("id", sketch.id);
+      if (error) throw error;
+
+      setSketches(prev => prev.filter(s => s.id !== sketch.id));
+      setPatient(prev => prev ? { ...prev, total_sketches: Math.max(0, (prev.total_sketches ?? 1) - 1) } : prev);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete sketch. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -421,7 +482,9 @@ export default function ChildProgressDetail() {
             bg: "bg-pink-50",
           },
           {
-            icon: <span className="text-lg">{dominantEmotion && dominantEmotion[1] > 0 ? EMOTIONS[dominantEmotion[0]]?.emoji : "—"}</span>,
+            icon: dominantEmotion && dominantEmotion[1] > 0
+              ? <span className="w-5 h-5 rounded-full inline-block" style={{ backgroundColor: EMOTIONS[dominantEmotion[0]]?.color }} />
+              : <span className="w-5 h-5 rounded-full inline-block bg-gray-300" />,
             label: "Top Emotion",
             value: dominantEmotion && dominantEmotion[1] > 0 ? EMOTIONS[dominantEmotion[0]]?.label : "N/A",
             sub: dominantEmotion && dominantEmotion[1] > 0 ? `${dominantEmotion[1]} times` : "no data",
@@ -470,7 +533,10 @@ export default function ChildProgressDetail() {
                   return (
                     <div key={key}>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className={`font-medium ${e.text}`}>{e.emoji} {e.label}</span>
+                        <span className={`font-medium ${e.text} flex items-center gap-1.5`}>
+                          <EmotionIcon emotion={key} size={14} />
+                          {e.label}
+                        </span>
                         <span className="text-gray-500">{count} ({pct}%)</span>
                       </div>
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -503,7 +569,7 @@ export default function ChildProgressDetail() {
               <div className="flex flex-wrap gap-3 justify-center">
                 {Object.entries(EMOTIONS).map(([key, e]) => (
                   <div key={key} className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: e.color }} />
+                    <EmotionIcon emotion={key} size={14} />
                     {e.label}
                   </div>
                 ))}
@@ -513,36 +579,119 @@ export default function ChildProgressDetail() {
         </div>
       </div>
 
-      {/* Emotion Timeline */}
-      {sketches.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-4">
-            Recent Emotion Timeline
-            <span className="ml-2 text-gray-400 font-normal normal-case">(last {Math.min(sketches.length, 15)} sessions)</span>
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {sketches.slice(0, 15).map((s, i) => {
-              const e = EMOTIONS[s.emotion];
-              return (
-                <div
-                  key={s.id}
-                  title={`${e?.label} · ${new Date(s.created_at).toLocaleDateString("en-MY")}`}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${e?.bg} ${e?.text} ring-1 ${e?.ring} cursor-default`}
-                >
-                  <span>{e?.emoji}</span>
-                  <span className="text-[10px] opacity-70">#{sketches.length - i}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Emotion Timeline — Line Chart */}
+      {sketches.length > 0 && (() => {
+        const EMOTION_VALUE: Record<string, number> = {
+          happy: 3, sad: 2, angry: 1, anxious: 0,
+        };
+        const EMOTION_LABEL: Record<number, string> = {
+          3: "Happy", 2: "Sad", 1: "Angry", 0: "Anxious",
+        };
+        const count = Math.min(sketches.length, 20);
+        const chartData = sketches.slice(0, count).reverse().map((s, j) => ({
+          session: sketches.length - count + 1 + j,
+          value: EMOTION_VALUE[s.emotion] ?? 0,
+          emotion: s.emotion,
+          label: EMOTIONS[s.emotion]?.label ?? s.emotion,
+          color: EMOTIONS[s.emotion]?.color ?? "#d1d5db",
+          date: new Date(s.created_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" }),
+        }));
 
-      {/* Recent Sessions */}
+        const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: typeof chartData[0] }> }) => {
+          if (!active || !payload?.length) return null;
+          const d = payload[0].payload;
+          const e = EMOTIONS[d.emotion];
+          return (
+            <div className="bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-lg text-xs">
+              <p className="font-bold text-gray-800 mb-0.5">Session #{d.session}</p>
+              <p style={{ color: e?.color }} className="font-semibold flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: e?.color }} />
+                {e?.label}
+              </p>
+              <p className="text-gray-400">{d.date}</p>
+            </div>
+          );
+        };
+
+        return (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                Emotion Timeline
+              </h2>
+              <span className="text-xs text-gray-400">last {count} sessions · oldest → newest</span>
+            </div>
+
+            <ResponsiveContainer width="100%" height={200}>
+              <ScatterChart margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  dataKey="value"
+                  domain={[-0.4, 3.4]}
+                  ticks={[0, 1, 2, 3]}
+                  tickFormatter={(v: number) => EMOTION_LABEL[v] ?? ""}
+                  tick={{ fontSize: 11, fill: "#6b7280" }}
+                  width={80}
+                />
+                {[0, 1, 2, 3].map((v) => (
+                  <ReferenceLine
+                    key={v}
+                    y={v}
+                    stroke={Object.values(EMOTIONS)[3 - v]?.color + "40"}
+                    strokeDasharray="4 4"
+                  />
+                ))}
+                <Tooltip content={<CustomTooltip />} />
+                <Scatter
+                  data={chartData}
+                  shape={(props: { cx?: number; cy?: number; payload?: typeof chartData[0] }) => {
+                    const { cx, cy, payload } = props;
+                    if (cx == null || cy == null || !payload) return <g />;
+                    return (
+                      <circle
+                        cx={cx} cy={cy} r={8}
+                        fill={payload.color}
+                        stroke="#fff"
+                        strokeWidth={2.5}
+                      />
+                    );
+                  }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 justify-center mt-4">
+              {Object.entries(EMOTIONS).map(([key, em]) => (
+                <div key={key} className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <EmotionIcon emotion={key} size={15} />
+                  {em.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* All Sessions — Photo Gallery */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Recent Sessions</h2>
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+            All Sessions
+            <span className="ml-2 font-normal text-gray-400 normal-case">({sketches.length})</span>
+          </h2>
+          {role === "admin" && (
+            <span className="text-xs text-red-400 font-medium flex items-center gap-1">
+              <Trash2 size={12} /> Admin can delete
+            </span>
+          )}
         </div>
+
         {sketches.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <NotebookPen size={32} className="mb-3 opacity-30" />
@@ -550,25 +699,327 @@ export default function ChildProgressDetail() {
             <p className="text-xs mt-1">Sessions will appear here once the child submits drawings.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {sketches.slice(0, 8).map((sketch, i) => (
-              <div key={sketch.id} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-                <span className="text-xs text-gray-400 w-5 text-right">{i + 1}</span>
-                <EmotionBadge emotion={sketch.emotion} />
-                <span className="text-xs text-gray-400 ml-auto flex items-center gap-1">
-                  <Calendar size={11} />
-                  {new Date(sketch.created_at).toLocaleDateString("en-MY", {
-                    day: "numeric", month: "short", year: "numeric",
-                  })}
-                </span>
-                {sketch.notes && (
-                  <p className="text-xs text-gray-500 truncate max-w-[200px]">{sketch.notes}</p>
-                )}
-              </div>
-            ))}
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {sketches.map((sketch, i) => {
+              const e = EMOTIONS[sketch.emotion];
+              const sessionNum = sketches.length - i;
+              const fallbackDesc = `A ${e?.label.toLowerCase()} emotion was detected in this drawing session. Tap to see the full breakdown.`;
+              return (
+                <div
+                  key={sketch.id}
+                  onClick={() => setSelectedSketch(sketch)}
+                  className="group bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col"
+                >
+                  {/* Image */}
+                  <div className="relative aspect-[16/10] bg-gray-100 overflow-hidden flex-shrink-0">
+                    {sketch.image_url ? (
+                      <img
+                        src={sketch.image_url}
+                        alt={e?.label}
+                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{ backgroundColor: e?.color + "18" }}
+                      >
+                        <span
+                          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white"
+                          style={{ backgroundColor: e?.color }}
+                        >
+                          {e?.label.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Session # badge */}
+                    <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/40 text-white px-2 py-0.5 rounded-full">
+                      #{sessionNum}
+                    </span>
+                    {/* Admin delete */}
+                    {role === "admin" && (
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); deleteSketch(sketch); }}
+                        disabled={deletingId === sketch.id}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 shadow"
+                        title="Delete"
+                      >
+                        {deletingId === sketch.id
+                          ? <Loader2 size={10} className="animate-spin" />
+                          : <Trash2 size={10} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-4 flex flex-col flex-1">
+                    {/* Emotion tag */}
+                    <span
+                      className="text-[11px] font-black uppercase tracking-widest mb-2"
+                      style={{ color: e?.color }}
+                    >
+                      {e?.label}
+                    </span>
+
+                    {/* Session title */}
+                    <h3 className="text-sm font-bold text-gray-900 mb-1.5 leading-snug">
+                      Drawing Session #{sessionNum}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 flex-1">
+                      {sketch.therapist_message || fallbackDesc}
+                    </p>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0"
+                          style={{ backgroundColor: e?.color }}
+                        >
+                          {e?.label.charAt(0)}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(sketch.created_at).toLocaleDateString("en-MY", {
+                            day: "numeric", month: "short", year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-500 group-hover:text-[#e13d7d] transition-colors flex items-center gap-1">
+                        <ZoomIn size={12} /> View
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
+      {selectedSketch && (() => {
+        const e = EMOTIONS[selectedSketch.emotion];
+        const idx = sketches.findIndex(s => s.id === selectedSketch.id);
+        const sessionNum = sketches.length - idx;
+
+        return (
+          <div
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedSketch(null)}
+          >
+            <div
+              className="bg-white rounded-3xl overflow-hidden w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto"
+              onClick={ev => ev.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+                <div className="flex items-center gap-2">
+                  <EmotionBadge emotion={selectedSketch.emotion} />
+                  <span className="text-xs text-gray-400">· Session #{sessionNum}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedSketch(null)}
+                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Drawing */}
+              <div className="bg-gray-50 aspect-square">
+                {selectedSketch.image_url ? (
+                  <img
+                    src={selectedSketch.image_url}
+                    alt={e?.label}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center gap-3"
+                    style={{ backgroundColor: e?.color + "12" }}
+                  >
+                    <span
+                      className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black text-white shadow-sm"
+                      style={{ backgroundColor: e?.color }}
+                    >
+                      {e?.label.charAt(0)}
+                    </span>
+                    <span className="text-xs text-gray-400">No drawing saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Date row */}
+              <div className="px-5 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {new Date(selectedSketch.created_at).toLocaleDateString("en-MY", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                  })}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(selectedSketch.created_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+
+              {/* Session Emotion Result */}
+              <div className="px-5 pb-4">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-3">
+                  Session Result
+                </p>
+                {(() => {
+                  // Resolve per-emotion percentages from whichever format the mobile app stored
+                  const rawScores: Record<string, number | null | undefined> = {
+                    happy:   selectedSketch.scores?.happy   ?? selectedSketch.happy,
+                    sad:     selectedSketch.scores?.sad     ?? selectedSketch.sad,
+                    angry:   selectedSketch.scores?.angry   ?? selectedSketch.angry,
+                    anxious: selectedSketch.scores?.anxious ?? selectedSketch.anxious,
+                  };
+                  const hasBreakdown = Object.values(rawScores).some(v => v != null && v > 0);
+
+                  if (hasBreakdown) {
+                    // Normalize: values could be 0–1 or 0–100
+                    const maxVal = Math.max(...Object.values(rawScores).map(v => v ?? 0));
+                    const normalize = (v: number) => maxVal <= 1 ? Math.round(v * 100) : Math.round(v);
+                    return (
+                      <div className="space-y-3">
+                        {Object.entries(EMOTIONS).map(([key, em]) => {
+                          const raw = rawScores[key] ?? 0;
+                          const pct = normalize(raw as number);
+                          const isDominant = key === selectedSketch.emotion;
+                          return (
+                            <div key={key}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span
+                                  className="text-sm flex items-center gap-1.5"
+                                  style={{ color: isDominant ? em.color : undefined, fontWeight: isDominant ? 700 : 400 }}
+                                >
+                                  <EmotionIcon emotion={key} size={16} />
+                                  {em.label}
+                                  {isDominant && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: em.color }}>
+                                      top
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-sm font-bold" style={{ color: isDominant ? em.color : "#6b7280" }}>
+                                  {pct}%
+                                </span>
+                              </div>
+                              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-700"
+                                  style={{ width: `${pct}%`, backgroundColor: em.color, opacity: isDominant ? 1 : 0.55 }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  // Fallback: no individual scores stored — show dominant emotion only
+                  const fallbackPct = selectedSketch.score != null
+                    ? (selectedSketch.score <= 1 ? Math.round((selectedSketch.score as number) * 100) : Math.round(selectedSketch.score as number))
+                    : 100;
+                  return (
+                    <div
+                      className="rounded-2xl p-5 flex items-center gap-4"
+                      style={{ background: `linear-gradient(135deg, ${e?.color}18, ${e?.color}35)`, border: `1.5px solid ${e?.color}40` }}
+                    >
+                      <div
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+                        style={{ backgroundColor: e?.color }}
+                      >
+                        {e?.label.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: e?.color }}>Detected Emotion</p>
+                        <p className="text-2xl font-black text-gray-900">{e?.label}</p>
+                        <div className="mt-1.5">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">Confidence</span>
+                            <span className="font-bold" style={{ color: e?.color }}>{fallbackPct}%</span>
+                          </div>
+                          <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${fallbackPct}%`, backgroundColor: e?.color }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Therapist notes */}
+              {selectedSketch.notes && (
+                <div className="px-5 pb-4 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Therapist Notes</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedSketch.notes}</p>
+                </div>
+              )}
+
+              {/* HTP Clinical Observations — therapist & admin only */}
+              {(role === "therapist" || role === "admin") &&
+                selectedSketch.htp_features &&
+                selectedSketch.htp_features.length > 0 && (
+                <div className="px-5 pb-5 pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                      Clinical Observations (HTP/DAP)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedSketch.htp_features.map((f, i) => {
+                      const severityColor =
+                        f.severity >= 7
+                          ? { dot: "bg-red-500", badge: "bg-red-50 text-red-700 border-red-200" }
+                          : f.severity >= 4
+                          ? { dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" }
+                          : { dot: "bg-green-500", badge: "bg-green-50 text-green-700 border-green-200" };
+                      return (
+                        <div key={i} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${severityColor.dot}`} />
+                              <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+                                {f.category}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${severityColor.badge}`}>
+                              {f.severity}/10
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-gray-800 mb-0.5">{f.observation}</p>
+                          <p className="text-xs text-gray-400 italic leading-relaxed">{f.interpretation}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-300 mt-3 text-center italic">
+                    For clinical reference only · Not a diagnosis
+                  </p>
+                </div>
+              )}
+
+              {/* Admin delete */}
+              {role === "admin" && (
+                <div className="px-5 py-3 border-t border-gray-100">
+                  <button
+                    onClick={() => { setSelectedSketch(null); deleteSketch(selectedSketch); }}
+                    disabled={deletingId === selectedSketch.id}
+                    className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 font-medium disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 size={14} /> Delete this session
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Personality Notes */}
       {patient.personality && (
