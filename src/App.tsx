@@ -18,6 +18,8 @@ import UsersManagement from "./pages/UserManagement";
 import ChildrenProgress from "./pages/ChildrenProgress";
 import ChildProgressDetail from "./pages/ChildProgressDetail";
 import TherapistAnalytics from "./pages/TherapistAnalytics";
+import TherapistList from "./pages/TherapistList";
+import TherapistProfile from "./pages/TherapistProfile";
 import Settings from "./pages/Settings";
 
 function App() {
@@ -37,6 +39,8 @@ function App() {
           <Route path="children/:id" element={<ChildProgressDetail />} />
           <Route path="patients/edit/:id" element={<EditPatient />} />
           <Route path="analytics" element={<TherapistAnalytics />} />
+          <Route path="therapists" element={<TherapistList />} />
+          <Route path="therapists/:id" element={<TherapistProfile />} />
           <Route path="users" element={<UsersManagement />} />
           <Route path="users/add" element={<AddUser />} />
           <Route path="users/edit/:id" element={<EditUser />} />

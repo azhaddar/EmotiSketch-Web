@@ -9,6 +9,7 @@ import {
   UserPlus,
   Users,
   BarChart3,
+  GraduationCap,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import React, { useEffect, useState } from "react";
@@ -84,6 +85,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       path: "/dashboard/analytics",
       icon: <BarChart3 size={20} />,
       visible: role === "therapist" || role === "admin",
+    },
+    {
+      name: "Therapists",
+      path: "/dashboard/therapists",
+      icon: <GraduationCap size={20} />,
+      visible: role === "admin" || role === "therapist" || role === "user",
     },
     {
       name: "Users",

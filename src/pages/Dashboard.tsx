@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import {
   Users, Brain, TrendingUp, AlertTriangle, ArrowRight,
   CalendarDays, Clock, ChevronRight, UserCheck, Activity,
+  GraduationCap, Bell,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
 
@@ -54,6 +55,9 @@ export default function Dashboard() {
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [userCount, setUserCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [incompleteTherapistCount, setIncompleteTherapistCount] = useState(0);
+  const [myUserId, setMyUserId] = useState("");
 
   useEffect(() => { loadData(); }, []);
 
@@ -61,6 +65,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setMyUserId(user.id);
 
     const { data: prof } = await supabase
       .from("profiles").select("full_name, role").eq("id", user.id).single();
@@ -94,10 +99,33 @@ export default function Dashboard() {
       );
     }
 
-    // Admin: get total user count
+    // Admin: get total user count + incomplete therapist profiles
     if (role === "admin") {
       const { count } = await supabase.from("profiles").select("id", { count: "exact", head: true });
       setUserCount(count ?? 0);
+
+      const { data: allTherapists } = await supabase
+        .from("profiles").select("id").eq("role", "therapist");
+      if (allTherapists && allTherapists.length > 0) {
+        const ids = allTherapists.map(t => t.id);
+        const { data: filled } = await supabase
+          .from("therapist_profiles")
+          .select("id")
+          .in("id", ids)
+          .not("professional_title", "is", null)
+          .not("license_number", "is", null);
+        setIncompleteTherapistCount(allTherapists.length - (filled?.length ?? 0));
+      }
+    }
+
+    // Therapist: check if own profile is complete
+    if (role === "therapist") {
+      const { data: tp } = await supabase
+        .from("therapist_profiles")
+        .select("professional_title, license_number")
+        .eq("id", user.id)
+        .single();
+      setProfileIncomplete(!tp?.professional_title || !tp?.license_number);
     }
 
     setLoading(false);
@@ -149,6 +177,45 @@ export default function Dashboard() {
           {now.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
         </div>
       </div>
+
+      {/* ── Profile incomplete notifications ───────────────── */}
+      {role === "therapist" && profileIncomplete && (
+        <div className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <Bell size={18} className="text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800">Your therapist profile is incomplete</p>
+            <p className="text-sm text-amber-600">Add your qualifications and licence number so parents can verify your credentials.</p>
+          </div>
+          <button
+            onClick={() => navigate(`/dashboard/therapists/${myUserId}`)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 transition-colors flex-shrink-0"
+          >
+            <GraduationCap size={14} /> Complete Profile
+          </button>
+        </div>
+      )}
+
+      {role === "admin" && incompleteTherapistCount > 0 && (
+        <div className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <Bell size={18} className="text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800">
+              {incompleteTherapistCount} therapist{incompleteTherapistCount > 1 ? "s have" : " has"} incomplete profiles
+            </p>
+            <p className="text-sm text-amber-600">Remind them to fill in their qualifications and licence number.</p>
+          </div>
+          <button
+            onClick={() => navigate("/dashboard/therapists")}
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 transition-colors flex-shrink-0"
+          >
+            <GraduationCap size={14} /> View Therapists
+          </button>
+        </div>
+      )}
 
       {/* ── Stat cards ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

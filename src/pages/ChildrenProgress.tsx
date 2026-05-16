@@ -47,6 +47,8 @@ export default function ChildrenProgress() {
   const [therapists, setTherapists] = useState<{ id: string; full_name: string }[]>([]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [statusSavedId, setStatusSavedId] = useState<string | null>(null);
 
   // Controls
   const [search, setSearch] = useState("");
@@ -144,6 +146,25 @@ export default function ChildrenProgress() {
       alert("Failed to assign therapist. Please try again.");
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  async function updateChildStatus(childId: string, newStatus: string) {
+    setUpdatingStatusId(childId);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ status: newStatus })
+        .eq("id", childId);
+      if (error) throw error;
+      setChildren(prev => prev.map(c => c.id === childId ? { ...c, status: newStatus } : c));
+      setStatusSavedId(childId);
+      setTimeout(() => setStatusSavedId(null), 2500);
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setUpdatingStatusId(null);
     }
   }
 
@@ -460,13 +481,41 @@ export default function ChildrenProgress() {
                     </button>
                   </div>
                 ) : (
-                  <div className={`mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm font-medium ${
-                    isOwnPatient || userRole !== "therapist"
-                      ? "text-pink-600 group-hover:text-pink-700"
-                      : "text-gray-400"
-                  }`}>
-                    View Detailed Report
-                    <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
+                  <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                    {/* Status dropdown — therapist's own patients only */}
+                    {userRole === "therapist" && isOwnPatient && (
+                      <div onClick={e => e.stopPropagation()}>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Status</p>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={child.status}
+                            onChange={e => updateChildStatus(child.id, e.target.value)}
+                            disabled={updatingStatusId === child.id}
+                            className={`flex-1 text-xs font-semibold border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer disabled:opacity-50 ${
+                              child.status === "Active"
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : child.status === "Complete"
+                                ? "bg-teal-50 text-teal-700 border-teal-200"
+                                : "bg-gray-50 text-gray-500 border-gray-200"
+                            }`}
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Complete">Complete</option>
+                          </select>
+                          {updatingStatusId === child.id && <Loader2 size={14} className="animate-spin text-pink-500 flex-shrink-0" />}
+                          {statusSavedId === child.id && <Check size={14} className="text-green-500 flex-shrink-0" />}
+                        </div>
+                      </div>
+                    )}
+                    <div className={`flex items-center justify-between text-sm font-medium ${
+                      isOwnPatient || userRole !== "therapist"
+                        ? "text-pink-600 group-hover:text-pink-700"
+                        : "text-gray-400"
+                    }`}>
+                      View Detailed Report
+                      <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
                 )}
               </div>
