@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   User, NotebookPen, ArrowRight, Loader2, Plus,
-  Search, SlidersHorizontal, ArrowUpDown, X,
+  Search, SlidersHorizontal, ArrowUpDown, X, Check,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -14,10 +14,11 @@ interface Child {
   total_sketches: number;
   status: string;
   therapist_id?: string | null;
+  therapist?: { id: string; full_name: string } | null;
 }
 
 type SortKey = "name_asc" | "name_desc" | "age_asc" | "age_desc" | "sketches_desc" | "sketches_asc";
-type StatusFilter = "all" | "active" | "inactive" | "unassigned";
+type StatusFilter = "all" | "active" | "inactive" | "complete" | "unassigned";
 type GenderFilter = "all" | "Male" | "Female";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -33,6 +34,7 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "all",        label: "All" },
   { value: "active",     label: "Active" },
   { value: "inactive",   label: "Inactive" },
+  { value: "complete",   label: "Complete" },
   { value: "unassigned", label: "Unassigned" },
 ];
 
@@ -41,6 +43,10 @@ export default function ChildrenProgress() {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState("");
+  const [userId, setUserId] = useState<string>("");
+  const [therapists, setTherapists] = useState<{ id: string; full_name: string }[]>([]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   // Controls
   const [search, setSearch] = useState("");
@@ -56,6 +62,7 @@ export default function ChildrenProgress() {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setUserId(user.id);
 
       const { data: profile } = await supabase
         .from("profiles").select("role").eq("id", user.id).single();
@@ -63,10 +70,20 @@ export default function ChildrenProgress() {
       const role = profile?.role?.toLowerCase() || "user";
       setUserRole(role);
 
-      let query = supabase.from("patients").select("*");
+      if (role === "admin") {
+        const { data: therapistData } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("role", "therapist")
+          .order("full_name");
+        setTherapists(therapistData || []);
+      }
+
+      let query = supabase.from("patients").select("*, therapist:profiles!therapist_id(id, full_name)");
 
       if (role === "therapist") {
-        query = query.eq("therapist_id", user.id);
+        // Show own patients + unassigned patients available to claim
+        query = query.or(`therapist_id.eq.${user.id},therapist_id.is.null`);
       } else if (role === "user") {
         query = query.eq("guardian_id", user.id);
       }
@@ -81,6 +98,55 @@ export default function ChildrenProgress() {
     }
   }
 
+  async function claimPatient(childId: string, childName: string) {
+    const confirmed = window.confirm(
+      `Claim ${childName} as your patient?\n\nThis will assign you as their therapist and set their status to Active.`
+    );
+    if (!confirmed) return;
+    setAssigningId(childId);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ therapist_id: userId, status: "Active" })
+        .eq("id", childId);
+      if (error) throw error;
+      setChildren(prev => prev.map(c => c.id === childId
+        ? { ...c, therapist_id: userId, status: "Active" }
+        : c));
+      setSavedId(childId);
+      setTimeout(() => setSavedId(null), 2500);
+    } catch (err) {
+      console.error("Failed to claim patient:", err);
+      alert("Failed to claim patient. Please try again.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  async function assignTherapist(childId: string, therapistId: string | null) {
+    setAssigningId(childId);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ therapist_id: therapistId })
+        .eq("id", childId);
+      if (error) throw error;
+      const matched = therapistId ? therapists.find(t => t.id === therapistId) : null;
+      setChildren(prev => prev.map(c => c.id === childId ? {
+        ...c,
+        therapist_id: therapistId,
+        therapist: matched ? { id: matched.id, full_name: matched.full_name } : null,
+      } : c));
+      setSavedId(childId);
+      setTimeout(() => setSavedId(null), 2500);
+    } catch (err) {
+      console.error("Failed to assign therapist:", err);
+      alert("Failed to assign therapist. Please try again.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
   const getDisplayStatus = (child: Child) =>
     !child.therapist_id ? "Unassigned" : child.status;
 
@@ -89,6 +155,7 @@ export default function ChildrenProgress() {
       case "Unassigned": return "bg-yellow-100 text-yellow-700 border border-yellow-200";
       case "Active":     return "bg-green-100 text-green-700 border border-green-200";
       case "Inactive":   return "bg-gray-100 text-gray-600 border border-gray-200";
+      case "Complete":   return "bg-teal-100 text-teal-700 border border-teal-200";
       default:           return "bg-gray-100 text-gray-600";
     }
   };
@@ -318,11 +385,18 @@ export default function ChildrenProgress() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((child) => {
             const displayStatus = getDisplayStatus(child);
+            const isUnassigned = !child.therapist_id;
+            const isOwnPatient = child.therapist_id === userId;
+
             return (
               <div
                 key={child.id}
-                onClick={() => navigate(`/dashboard/children/${child.id}`)}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => !isUnassigned && navigate(`/dashboard/children/${child.id}`)}
+                className={`bg-white rounded-xl shadow-sm border p-6 transition-shadow group ${
+                  isUnassigned && userRole === "therapist"
+                    ? "border-dashed border-gray-300 cursor-default"
+                    : "border-gray-200 hover:shadow-md cursor-pointer"
+                }`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -348,10 +422,53 @@ export default function ChildrenProgress() {
                   <span className="font-semibold text-gray-900">{child.total_sketches || 0}</span>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-pink-600 text-sm font-medium group-hover:text-pink-700">
-                  View Detailed Report
-                  <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
-                </div>
+                {/* Admin: therapist assignment dropdown */}
+                {userRole === "admin" && (
+                  <div className="mt-4 pt-4 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Assigned Therapist</p>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={child.therapist_id || ""}
+                        onChange={e => assignTherapist(child.id, e.target.value || null)}
+                        disabled={assigningId === child.id}
+                        className="flex-1 text-sm text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white disabled:opacity-50 cursor-pointer"
+                      >
+                        <option value="">— Unassigned —</option>
+                        {therapists.map(t => (
+                          <option key={t.id} value={t.id}>{t.full_name}</option>
+                        ))}
+                      </select>
+                      {assigningId === child.id && <Loader2 size={14} className="animate-spin text-pink-500 flex-shrink-0" />}
+                      {savedId === child.id && <Check size={14} className="text-green-500 flex-shrink-0" />}
+                    </div>
+                  </div>
+                )}
+
+                {/* Therapist: claim button for unassigned, or view report for own */}
+                {userRole === "therapist" && isUnassigned ? (
+                  <div className="mt-4 pt-4 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => claimPatient(child.id, child.full_name)}
+                      disabled={assigningId === child.id}
+                      className="w-full py-2 rounded-xl text-sm font-semibold bg-[#e13d7d] text-white hover:bg-pink-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {assigningId === child.id
+                        ? <><Loader2 size={14} className="animate-spin" /> Claiming...</>
+                        : savedId === child.id
+                        ? <><Check size={14} /> Claimed!</>
+                        : "Claim Patient"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm font-medium ${
+                    isOwnPatient || userRole !== "therapist"
+                      ? "text-pink-600 group-hover:text-pink-700"
+                      : "text-gray-400"
+                  }`}>
+                    View Detailed Report
+                    <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
+                  </div>
+                )}
               </div>
             );
           })}

@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
   ZoomIn,
+  Check,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
 
@@ -40,6 +41,7 @@ interface Sketch {
   emotion: "happy" | "sad" | "angry" | "anxious";
   created_at: string;
   notes?: string;
+  therapist_notes?: string | null;
   image_url?: string | null;
   score?: number | null;
   analysis?: string | null;
@@ -312,20 +314,44 @@ export default function ChildProgressDetail() {
   const [role, setRole] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedSketch, setSelectedSketch] = useState<Sketch | null>(null);
+  const [noteText, setNoteText] = useState<string>("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [therapists, setTherapists] = useState<{ id: string; full_name: string }[]>([]);
+  const [assigningTherapist, setAssigningTherapist] = useState(false);
+  const [therapistSaved, setTherapistSaved] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusSaved, setStatusSaved] = useState(false);
 
   useEffect(() => {
     if (id) fetchData(id);
   }, [id]);
+
+  useEffect(() => {
+    setNoteText(selectedSketch?.therapist_notes ?? "");
+    setNoteSaved(false);
+  }, [selectedSketch?.id]);
 
   async function fetchData(patientId: string) {
     try {
       setLoading(true);
 
       const { data: { user } } = await supabase.auth.getUser();
+      let resolvedRole = "";
       if (user) {
         const { data: prof } = await supabase
           .from("profiles").select("role").eq("id", user.id).single();
-        setRole((prof?.role ?? "").toLowerCase());
+        resolvedRole = (prof?.role ?? "").toLowerCase();
+        setRole(resolvedRole);
+      }
+
+      if (resolvedRole === "admin") {
+        const { data: therapistData } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("role", "therapist")
+          .order("full_name");
+        setTherapists(therapistData || []);
       }
 
       const { data: patientData, error: patientError } = await supabase
@@ -374,6 +400,73 @@ export default function ChildProgressDetail() {
       alert("Failed to delete sketch. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function updateStatus(newStatus: string) {
+    if (!patient) return;
+    setUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ status: newStatus })
+        .eq("id", patient.id);
+      if (error) throw error;
+      setPatient(prev => prev ? { ...prev, status: newStatus } : prev);
+      setStatusSaved(true);
+      setTimeout(() => setStatusSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
+  async function assignTherapist(therapistId: string | null) {
+    if (!patient) return;
+    setAssigningTherapist(true);
+    try {
+      const { error } = await supabase
+        .from("patients")
+        .update({ therapist_id: therapistId })
+        .eq("id", patient.id);
+      if (error) throw error;
+      const matched = therapistId ? therapists.find(t => t.id === therapistId) : null;
+      setPatient(prev => prev ? {
+        ...prev,
+        therapist_id: therapistId,
+        therapist: matched ? { full_name: matched.full_name } : undefined,
+      } : prev);
+      setTherapistSaved(true);
+      setTimeout(() => setTherapistSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to assign therapist:", err);
+      alert("Failed to assign therapist. Please try again.");
+    } finally {
+      setAssigningTherapist(false);
+    }
+  }
+
+  async function saveNote() {
+    if (!selectedSketch) return;
+    setSavingNote(true);
+    try {
+      const { error } = await supabase
+        .from("sketches")
+        .update({ therapist_notes: noteText.trim() || null })
+        .eq("id", selectedSketch.id);
+      if (error) throw error;
+      const saved = noteText.trim() || null;
+      setSketches(prev => prev.map(s => s.id === selectedSketch.id ? { ...s, therapist_notes: saved } : s));
+      setSelectedSketch(prev => prev ? { ...prev, therapist_notes: saved } : prev);
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to save note:", err);
+      alert("Failed to save note. Please try again.");
+    } finally {
+      setSavingNote(false);
     }
   }
 
@@ -435,17 +528,42 @@ export default function ChildProgressDetail() {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold text-gray-900">{patient.full_name}</h1>
-            <span
-              className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
-                displayStatus === "Active"
-                  ? "bg-green-100 text-green-700 border-green-200"
-                  : displayStatus === "Unassigned"
-                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                  : "bg-gray-100 text-gray-500 border-gray-200"
-              }`}
-            >
-              {displayStatus}
-            </span>
+            {(role === "therapist" || role === "admin") && patient.therapist_id ? (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={patient.status}
+                  onChange={e => updateStatus(e.target.value)}
+                  disabled={updatingStatus}
+                  className={`text-[10px] font-bold uppercase rounded-full border px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer disabled:opacity-50 ${
+                    patient.status === "Active"
+                      ? "bg-green-100 text-green-700 border-green-200"
+                      : patient.status === "Complete"
+                      ? "bg-teal-100 text-teal-700 border-teal-200"
+                      : "bg-gray-100 text-gray-500 border-gray-200"
+                  }`}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Complete">Complete</option>
+                </select>
+                {updatingStatus && <Loader2 size={12} className="animate-spin text-pink-500" />}
+                {statusSaved && <Check size={12} className="text-green-500" />}
+              </div>
+            ) : (
+              <span
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
+                  displayStatus === "Active"
+                    ? "bg-green-100 text-green-700 border-green-200"
+                    : displayStatus === "Unassigned"
+                    ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                    : displayStatus === "Complete"
+                    ? "bg-teal-100 text-teal-700 border-teal-200"
+                    : "bg-gray-100 text-gray-500 border-gray-200"
+                }`}
+              >
+                {displayStatus}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
             <span className="flex items-center gap-1"><User size={13} /> {patient.age} years old · {patient.gender}</span>
@@ -454,11 +572,33 @@ export default function ChildProgressDetail() {
                 <span className="text-gray-300">|</span> Parent: <span className="text-gray-700 font-medium">{patient.guardian.full_name}</span>
               </span>
             )}
-            {patient.therapist?.full_name && (
+            {role === "admin" ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                <span className="text-gray-300">|</span>
+                <span>Therapist:</span>
+                <select
+                  value={patient.therapist_id || ""}
+                  onChange={e => assignTherapist(e.target.value || null)}
+                  disabled={assigningTherapist}
+                  className="text-sm font-medium text-gray-700 border border-gray-200 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer disabled:opacity-50 bg-white"
+                >
+                  <option value="">— Unassigned —</option>
+                  {therapists.map(t => (
+                    <option key={t.id} value={t.id}>{t.full_name}</option>
+                  ))}
+                </select>
+                {assigningTherapist && <Loader2 size={13} className="animate-spin text-pink-500" />}
+                {therapistSaved && (
+                  <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1">
+                    <Check size={11} /> Assigned
+                  </span>
+                )}
+              </span>
+            ) : patient.therapist?.full_name ? (
               <span className="flex items-center gap-1">
                 <span className="text-gray-300">|</span> Therapist: <span className="text-gray-700 font-medium">{patient.therapist.full_name}</span>
               </span>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -803,31 +943,30 @@ export default function ChildProgressDetail() {
         const idx = sketches.findIndex(s => s.id === selectedSketch.id);
         const sessionNum = sketches.length - idx;
 
+        const rawScores: Record<string, number | null | undefined> = {
+          happy:   selectedSketch.scores?.happy   ?? selectedSketch.happy,
+          sad:     selectedSketch.scores?.sad     ?? selectedSketch.sad,
+          angry:   selectedSketch.scores?.angry   ?? selectedSketch.angry,
+          anxious: selectedSketch.scores?.anxious ?? selectedSketch.anxious,
+        };
+        const hasBreakdown = Object.values(rawScores).some(v => v != null && v > 0);
+        const maxVal = Math.max(...Object.values(rawScores).map(v => v ?? 0));
+        const normalize = (v: number) => maxVal <= 1 ? Math.round(v * 100) : Math.round(v);
+        const fallbackPct = selectedSketch.score != null
+          ? (selectedSketch.score <= 1 ? Math.round((selectedSketch.score as number) * 100) : Math.round(selectedSketch.score as number))
+          : 100;
+
         return (
           <div
-            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
             onClick={() => setSelectedSketch(null)}
           >
             <div
-              className="bg-white rounded-3xl overflow-hidden w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-3xl overflow-hidden w-full max-w-4xl shadow-2xl flex max-h-[90vh]"
               onClick={ev => ev.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-                <div className="flex items-center gap-2">
-                  <EmotionBadge emotion={selectedSketch.emotion} />
-                  <span className="text-xs text-gray-400">· Session #{sessionNum}</span>
-                </div>
-                <button
-                  onClick={() => setSelectedSketch(null)}
-                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Drawing */}
-              <div className="bg-gray-50 aspect-square">
+              {/* ── Left: Drawing Panel ── */}
+              <div className="relative w-2/5 flex-shrink-0 bg-gray-950 flex items-center justify-center overflow-hidden">
                 {selectedSketch.image_url ? (
                   <img
                     src={selectedSketch.image_url}
@@ -836,52 +975,74 @@ export default function ChildProgressDetail() {
                   />
                 ) : (
                   <div
-                    className="w-full h-full flex flex-col items-center justify-center gap-3"
-                    style={{ backgroundColor: e?.color + "12" }}
+                    className="w-full h-full flex flex-col items-center justify-center gap-4"
+                    style={{ backgroundColor: e?.color + "22" }}
                   >
                     <span
-                      className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black text-white shadow-sm"
+                      className="w-24 h-24 rounded-3xl flex items-center justify-center text-4xl font-black text-white shadow-lg"
                       style={{ backgroundColor: e?.color }}
                     >
                       {e?.label.charAt(0)}
                     </span>
-                    <span className="text-xs text-gray-400">No drawing saved</span>
+                    <span className="text-sm text-gray-400">No drawing saved</span>
                   </div>
+                )}
+
+                {/* Gradient overlay at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-5 py-4">
+                  <EmotionBadge emotion={selectedSketch.emotion} />
+                  <p className="text-white/70 text-xs mt-1">Session #{sessionNum}</p>
+                </div>
+
+                {/* Session # badge top-left */}
+                <span className="absolute top-3 left-3 text-[10px] font-bold bg-black/40 text-white px-2 py-1 rounded-full backdrop-blur-sm">
+                  #{sessionNum}
+                </span>
+
+                {/* Admin delete top-right */}
+                {role === "admin" && (
+                  <button
+                    onClick={() => { setSelectedSketch(null); deleteSketch(selectedSketch); }}
+                    disabled={deletingId === selectedSketch.id}
+                    className="absolute top-3 right-3 p-2 rounded-full bg-red-500 text-white disabled:opacity-50 shadow-lg hover:bg-red-600 transition-colors"
+                    title="Delete session"
+                  >
+                    {deletingId === selectedSketch.id
+                      ? <Loader2 size={13} className="animate-spin" />
+                      : <Trash2 size={13} />}
+                  </button>
                 )}
               </div>
 
-              {/* Date row */}
-              <div className="px-5 py-2.5 border-b border-gray-100 flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  {new Date(selectedSketch.created_at).toLocaleDateString("en-MY", {
-                    weekday: "long", day: "numeric", month: "long", year: "numeric",
-                  })}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {new Date(selectedSketch.created_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
+              {/* ── Right: Content Panel ── */}
+              <div className="flex-1 flex flex-col min-h-0">
+                {/* Header */}
+                <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Drawing Session #{sessionNum}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(selectedSketch.created_at).toLocaleDateString("en-MY", {
+                        weekday: "long", day: "numeric", month: "long", year: "numeric",
+                      })}
+                      {" · "}
+                      {new Date(selectedSketch.created_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedSketch(null)}
+                    className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 ml-4"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
-              {/* Session Emotion Result */}
-              <div className="px-5 pb-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-3">
-                  Session Result
-                </p>
-                {(() => {
-                  // Resolve per-emotion percentages from whichever format the mobile app stored
-                  const rawScores: Record<string, number | null | undefined> = {
-                    happy:   selectedSketch.scores?.happy   ?? selectedSketch.happy,
-                    sad:     selectedSketch.scores?.sad     ?? selectedSketch.sad,
-                    angry:   selectedSketch.scores?.angry   ?? selectedSketch.angry,
-                    anxious: selectedSketch.scores?.anxious ?? selectedSketch.anxious,
-                  };
-                  const hasBreakdown = Object.values(rawScores).some(v => v != null && v > 0);
+                {/* Scrollable body */}
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
 
-                  if (hasBreakdown) {
-                    // Normalize: values could be 0–1 or 0–100
-                    const maxVal = Math.max(...Object.values(rawScores).map(v => v ?? 0));
-                    const normalize = (v: number) => maxVal <= 1 ? Math.round(v * 100) : Math.round(v);
-                    return (
+                  {/* Session Result */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-3">Session Result</p>
+                    {hasBreakdown ? (
                       <div className="space-y-3">
                         {Object.entries(EMOTIONS).map(([key, em]) => {
                           const raw = rawScores[key] ?? 0;
@@ -916,106 +1077,117 @@ export default function ChildProgressDetail() {
                           );
                         })}
                       </div>
-                    );
-                  }
-
-                  // Fallback: no individual scores stored — show dominant emotion only
-                  const fallbackPct = selectedSketch.score != null
-                    ? (selectedSketch.score <= 1 ? Math.round((selectedSketch.score as number) * 100) : Math.round(selectedSketch.score as number))
-                    : 100;
-                  return (
-                    <div
-                      className="rounded-2xl p-5 flex items-center gap-4"
-                      style={{ background: `linear-gradient(135deg, ${e?.color}18, ${e?.color}35)`, border: `1.5px solid ${e?.color}40` }}
-                    >
+                    ) : (
                       <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
-                        style={{ backgroundColor: e?.color }}
+                        className="rounded-2xl p-5 flex items-center gap-4"
+                        style={{ background: `linear-gradient(135deg, ${e?.color}18, ${e?.color}35)`, border: `1.5px solid ${e?.color}40` }}
                       >
-                        {e?.label.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: e?.color }}>Detected Emotion</p>
-                        <p className="text-2xl font-black text-gray-900">{e?.label}</p>
-                        <div className="mt-1.5">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-gray-500">Confidence</span>
-                            <span className="font-bold" style={{ color: e?.color }}>{fallbackPct}%</span>
-                          </div>
-                          <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${fallbackPct}%`, backgroundColor: e?.color }} />
-                          </div>
+                        <div
+                          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+                          style={{ backgroundColor: e?.color }}
+                        >
+                          {e?.label.charAt(0)}
                         </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Therapist notes */}
-              {selectedSketch.notes && (
-                <div className="px-5 pb-4 pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Therapist Notes</p>
-                  <p className="text-sm text-gray-700 leading-relaxed">{selectedSketch.notes}</p>
-                </div>
-              )}
-
-              {/* HTP Clinical Observations — therapist & admin only */}
-              {(role === "therapist" || role === "admin") &&
-                selectedSketch.htp_features &&
-                selectedSketch.htp_features.length > 0 && (
-                <div className="px-5 pb-5 pt-3 border-t border-gray-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 rounded-full bg-purple-500" />
-                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                      Clinical Observations (HTP/DAP)
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {selectedSketch.htp_features.map((f, i) => {
-                      const severityColor =
-                        f.severity >= 7
-                          ? { dot: "bg-red-500", badge: "bg-red-50 text-red-700 border-red-200" }
-                          : f.severity >= 4
-                          ? { dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" }
-                          : { dot: "bg-green-500", badge: "bg-green-50 text-green-700 border-green-200" };
-                      return (
-                        <div key={i} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${severityColor.dot}`} />
-                              <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
-                                {f.category}
-                              </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: e?.color }}>Detected Emotion</p>
+                          <p className="text-2xl font-black text-gray-900">{e?.label}</p>
+                          <div className="mt-1.5">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-500">Confidence</span>
+                              <span className="font-bold" style={{ color: e?.color }}>{fallbackPct}%</span>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${severityColor.badge}`}>
-                              {f.severity}/10
-                            </span>
+                            <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${fallbackPct}%`, backgroundColor: e?.color }} />
+                            </div>
                           </div>
-                          <p className="text-xs font-semibold text-gray-800 mb-0.5">{f.observation}</p>
-                          <p className="text-xs text-gray-400 italic leading-relaxed">{f.interpretation}</p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[10px] text-gray-300 mt-3 text-center italic">
-                    For clinical reference only · Not a diagnosis
-                  </p>
-                </div>
-              )}
 
-              {/* Admin delete */}
-              {role === "admin" && (
-                <div className="px-5 py-3 border-t border-gray-100">
-                  <button
-                    onClick={() => { setSelectedSketch(null); deleteSketch(selectedSketch); }}
-                    disabled={deletingId === selectedSketch.id}
-                    className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 font-medium disabled:opacity-50 transition-colors"
-                  >
-                    <Trash2 size={14} /> Delete this session
-                  </button>
+                  {/* Therapist Notes */}
+                  <div className="border-t border-gray-100 pt-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
+                        <NotebookPen size={12} />
+                        Therapist Notes
+                      </p>
+                      {noteSaved && (
+                        <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1">
+                          <Check size={11} /> Saved
+                        </span>
+                      )}
+                    </div>
+                    {(role === "therapist" || role === "admin") ? (
+                      <>
+                        <textarea
+                          value={noteText}
+                          onChange={ev => { setNoteText(ev.target.value); setNoteSaved(false); }}
+                          placeholder="Add your clinical observations about this session..."
+                          rows={4}
+                          className="w-full text-sm text-gray-700 border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-pink-300 placeholder:text-gray-300 leading-relaxed"
+                        />
+                        <button
+                          onClick={saveNote}
+                          disabled={savingNote}
+                          className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-[#e13d7d] text-white hover:bg-pink-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                        >
+                          {savingNote
+                            ? <><Loader2 size={14} className="animate-spin" /> Saving...</>
+                            : <><Check size={14} /> Save Note</>}
+                        </button>
+                      </>
+                    ) : selectedSketch.therapist_notes ? (
+                      <p className="text-sm text-gray-700 leading-relaxed">{selectedSketch.therapist_notes}</p>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No notes added yet.</p>
+                    )}
+                  </div>
+
+                  {/* HTP Clinical Observations — therapist & admin only */}
+                  {(role === "therapist" || role === "admin") &&
+                    selectedSketch.htp_features &&
+                    selectedSketch.htp_features.length > 0 && (
+                    <div className="border-t border-gray-100 pt-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 rounded-full bg-purple-500" />
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                          Clinical Observations (HTP/DAP)
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedSketch.htp_features.map((f, i) => {
+                          const severityColor =
+                            f.severity >= 7
+                              ? { dot: "bg-red-500", badge: "bg-red-50 text-red-700 border-red-200" }
+                              : f.severity >= 4
+                              ? { dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" }
+                              : { dot: "bg-green-500", badge: "bg-green-50 text-green-700 border-green-200" };
+                          return (
+                            <div key={i} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${severityColor.dot}`} />
+                                  <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{f.category}</span>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${severityColor.badge}`}>
+                                  {f.severity}/10
+                                </span>
+                              </div>
+                              <p className="text-xs font-semibold text-gray-800 mb-0.5">{f.observation}</p>
+                              <p className="text-xs text-gray-400 italic leading-relaxed">{f.interpretation}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-gray-300 mt-3 text-center italic">
+                        For clinical reference only · Not a diagnosis
+                      </p>
+                    </div>
+                  )}
+
                 </div>
-              )}
+              </div>
             </div>
           </div>
         );
