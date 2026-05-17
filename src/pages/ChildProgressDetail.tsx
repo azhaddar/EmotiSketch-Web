@@ -852,7 +852,7 @@ export default function ChildProgressDetail() {
         ) : (
           <>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {(showAllSessions ? sketches : sketches.slice(0, 3)).map((sketch, i) => {
+            {(showAllSessions ? sketches : sketches.slice(0, 3)).map((sketch) => {
               const e = EMOTIONS[sketch.emotion];
               const sessionNum = sketches.length - sketches.indexOf(sketch);
               const fallbackDesc = `A ${e?.label.toLowerCase()} emotion was detected in this drawing session. Tap to see the full breakdown.`;

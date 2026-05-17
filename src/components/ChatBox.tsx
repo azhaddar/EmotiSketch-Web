@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import {
   X, ChevronLeft, Send, MessageSquare, Paperclip,
   PenLine, BarChart2, TrendingUp, X as XIcon,
-  AtSign, User, Users,
+  AtSign, User,
 } from "lucide-react";
 
 // ── Emotion config ──────────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ export default function ChatBox({ open, onClose, onUnreadChange }: Props) {
   function selectResult(s: SketchRaw & { sessionNum: number }) {
     if (!active) return;
     const pName = active.patientIdMap[s.patient_id] ?? "";
-    const scores = computeScores(s as Record<string, unknown>);
+    const scores = computeScores(s as unknown as Record<string, unknown>);
     setPendingAttachment({
       type: "result", id: s.id,
       title: `Drawing Session #${s.sessionNum}`,

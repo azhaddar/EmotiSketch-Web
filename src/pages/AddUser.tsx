@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 // 1. Add createClient to imports
 import { createClient } from "@supabase/supabase-js";
-// We still import the main 'supabase' to check our current session if needed,
-// but we won't use it for the signUp call.
-import { supabase } from "../lib/supabaseClient";
+
 
 export default function AddUser() {
   const navigate = useNavigate();
@@ -37,7 +35,7 @@ export default function AddUser() {
       );
 
       // 3. Use tempSupabase instead of the global 'supabase'
-      const { data, error: authError } = await tempSupabase.auth.signUp({
+      const { error: authError } = await tempSupabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {

@@ -31,7 +31,7 @@ export default function EditUser() {
   }, [id, location.state]);
 
   async function fetchUserData() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", id)

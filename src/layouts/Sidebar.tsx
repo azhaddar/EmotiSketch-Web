@@ -12,7 +12,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -35,7 +35,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       if (user) {
         setUserEmail(user.email ?? "");
 
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("profiles")
           .select("full_name, email, role")
           .eq("id", user.id)
