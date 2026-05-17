@@ -181,7 +181,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <span>Log out</span>
         </button>
         <p className="text-xs text-gray-400 text-center mt-4">
-          © 2025 EmotiSketch
+          © 2026 EmotiSketch
         </p>
       </div>
     </aside>
