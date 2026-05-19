@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import {
-  Users, Brain, TrendingUp, AlertTriangle, ArrowRight,
+  Users, TrendingUp, AlertTriangle, ArrowRight,
   CalendarDays, Clock, ChevronRight, UserCheck, Activity,
-  GraduationCap, Bell,
+  GraduationCap, Bell, Brain,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
+import CalendarWidget from "../components/CalendarWidget";
 
 type Emotion = "happy" | "sad" | "angry" | "anxious";
 type Role = "admin" | "therapist" | "user";
@@ -72,7 +73,6 @@ export default function Dashboard() {
     const role = (prof?.role ?? "user").toLowerCase() as Role;
     setProfile({ full_name: prof?.full_name ?? "User", role });
 
-    // Fetch patients based on role
     let pQuery = supabase.from("patients")
       .select("id, full_name, age, gender, total_sketches, status, therapist_id")
       .order("full_name");
@@ -82,7 +82,6 @@ export default function Dashboard() {
     const pts: Patient[] = pData ?? [];
     setPatients(pts);
 
-    // Fetch sketches with patient names
     if (pts.length > 0) {
       const ids = pts.map(p => p.id);
       const { data: sData } = await supabase
@@ -99,7 +98,6 @@ export default function Dashboard() {
       );
     }
 
-    // Admin: get total user count + incomplete therapist profiles
     if (role === "admin") {
       const { count } = await supabase.from("profiles").select("id", { count: "exact", head: true });
       setUserCount(count ?? 0);
@@ -118,7 +116,6 @@ export default function Dashboard() {
       }
     }
 
-    // Therapist: check if own profile is complete
     if (role === "therapist") {
       const { data: tp } = await supabase
         .from("therapist_profiles")
@@ -144,7 +141,6 @@ export default function Dashboard() {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  // Computed values
   const totalSketches = sketches.length;
   const weekSketches = thisWeekCount(sketches);
   const emotionCounts: Record<Emotion, number> = { happy: 0, sad: 0, angry: 0, anxious: 0 };
@@ -156,27 +152,8 @@ export default function Dashboard() {
     const recent = sketches.filter(s => s.patient_id === p.id).slice(0, 3);
     return recent.length === 3 && recent.every(s => s.emotion !== "happy");
   });
-  const recentSketches = sketches.slice(0, 8);
-
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-10">
-
-      {/* ── Welcome header ─────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {firstName}
-          </h1>
-          <p className="text-gray-500 mt-1 flex items-center gap-2">
-            <CalendarDays size={15} />
-            {dateStr}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm">
-          <Clock size={15} />
-          {now.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6 pb-10">
 
       {/* ── Profile incomplete notifications ───────────────── */}
       {role === "therapist" && profileIncomplete && (
@@ -217,40 +194,73 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Stat cards ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {role === "admin" && (
-          <>
-            <StatCard label="Total Users" value={userCount} icon={<Users size={20} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/users")} />
-            <StatCard label="Total Children" value={patients.length} icon={<UserCheck size={20} />} bg="bg-pink-50" text="text-pink-600" onClick={() => navigate("/dashboard/patients")} />
-            <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={20} />} bg="bg-purple-50" text="text-purple-600" />
-            <StatCard label="This Week" value={weekSketches} icon={<TrendingUp size={20} />} bg="bg-green-50" text="text-green-600" />
-          </>
-        )}
-        {role === "therapist" && (
-          <>
-            <StatCard label="Assigned Children" value={patients.length} icon={<Users size={20} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/patients")} />
-            <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={20} />} bg="bg-pink-50" text="text-pink-600" />
-            <StatCard label="This Week" value={weekSketches} icon={<Activity size={20} />} bg="bg-green-50" text="text-green-600" />
-            <StatCard label="Need Attention" value={atRisk.length} icon={<AlertTriangle size={20} />} bg="bg-red-50" text="text-red-600" onClick={() => navigate("/dashboard/analytics")} />
-          </>
-        )}
-        {role === "user" && (
-          <>
-            <StatCard label="My Children" value={patients.length} icon={<Users size={20} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/patients")} />
-            <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={20} />} bg="bg-pink-50" text="text-pink-600" />
-            <StatCard label="This Week" value={weekSketches} icon={<Activity size={20} />} bg="bg-green-50" text="text-green-600" />
-            <StatCard
-              label="Top Emotion"
-              value={dominantEmotion ? cap(dominantEmotion) : "—"}
-              icon={dominantEmotion
-                ? <EmotionIcon emotion={dominantEmotion} size={20} />
-                : <TrendingUp size={20} />}
-              bg="bg-purple-50"
-              text="text-purple-600"
-            />
-          </>
-        )}
+      {/* ── Top section: welcome banner (left) + stat cards (right) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Welcome card — wide left column */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-7 flex flex-col justify-between min-h-[200px]">
+          <div>
+            <p className="text-gray-400 text-sm flex items-center gap-2 mb-3">
+              <CalendarDays size={15} /> {dateStr}
+            </p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {firstName}
+            </h1>
+            <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+              {role === "therapist" && `You have ${patients.length} ${patients.length === 1 ? "child" : "children"} assigned to you.`}
+              {role === "admin" && `${userCount} registered users · ${patients.length} children in the system.`}
+              {role === "user" && `${patients.length} ${patients.length === 1 ? "child" : "children"} · ${totalSketches} total sketches recorded.`}
+            </p>
+          </div>
+          <div className="mt-6 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => navigate("/dashboard/children")}
+              className="px-5 py-2.5 bg-[#e13d7d] text-white text-sm font-semibold rounded-xl hover:bg-pink-600 transition-colors inline-flex items-center gap-2"
+            >
+              View Progress <ArrowRight size={15} />
+            </button>
+            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+              <Clock size={15} />
+              {now.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
+        </div>
+
+        {/* Stat cards — stacked in right column */}
+        <div className="flex flex-col gap-3">
+          {role === "admin" && (
+            <>
+              <StatCard label="Total Users" value={userCount} icon={<Users size={18} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/users")} />
+              <StatCard label="Total Children" value={patients.length} icon={<UserCheck size={18} />} bg="bg-pink-50" text="text-pink-600" onClick={() => navigate("/dashboard/patients")} />
+              <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={18} />} bg="bg-purple-50" text="text-purple-600" />
+              <StatCard label="This Week" value={weekSketches} icon={<TrendingUp size={18} />} bg="bg-green-50" text="text-green-600" />
+            </>
+          )}
+          {role === "therapist" && (
+            <>
+              <StatCard label="Assigned Children" value={patients.length} icon={<Users size={18} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/patients")} />
+              <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={18} />} bg="bg-pink-50" text="text-pink-600" />
+              <StatCard label="This Week" value={weekSketches} icon={<Activity size={18} />} bg="bg-green-50" text="text-green-600" />
+              <StatCard label="Need Attention" value={atRisk.length} icon={<AlertTriangle size={18} />} bg="bg-red-50" text="text-red-600" onClick={() => navigate("/dashboard/analytics")} />
+            </>
+          )}
+          {role === "user" && (
+            <>
+              <StatCard label="My Children" value={patients.length} icon={<Users size={18} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/patients")} />
+              <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={18} />} bg="bg-pink-50" text="text-pink-600" />
+              <StatCard label="This Week" value={weekSketches} icon={<Activity size={18} />} bg="bg-green-50" text="text-green-600" />
+              <StatCard
+                label="Top Emotion"
+                value={dominantEmotion ? cap(dominantEmotion) : "—"}
+                icon={dominantEmotion
+                  ? <EmotionIcon emotion={dominantEmotion} size={18} />
+                  : <TrendingUp size={18} />}
+                bg="bg-purple-50"
+                text="text-purple-600"
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── At-risk alert (therapist/admin) ────────────────── */}
@@ -276,74 +286,89 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Main content grid ───────────────────────────────── */}
+      {/* ── Bottom section: activity list (left) + widgets (right) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Recent activity — wide column */}
+        {/* Children overview — wide left column */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
+            <h2 className="text-lg font-bold text-gray-900">
+              {role === "user" ? "My Children" : "Children Overview"}
+            </h2>
             <button
               onClick={() => navigate("/dashboard/children")}
               className="text-sm text-[#e13d7d] font-medium hover:underline flex items-center gap-1"
             >
-              View all <ArrowRight size={14} />
+              See all <ArrowRight size={14} />
             </button>
           </div>
 
-          {recentSketches.length === 0 ? (
+          {patients.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <Brain size={40} className="mb-3 opacity-30" />
-              <p className="text-sm">No sketches yet</p>
+              <Users size={40} className="mb-3 opacity-30" />
+              <p className="text-sm">No children found</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {recentSketches.map(s => (
-                <div key={s.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                  {/* Emotion avatar or image */}
-                  {s.image_url ? (
-                    <img
-                      src={s.image_url}
-                      alt="sketch"
-                      className="w-12 h-12 rounded-lg object-cover shrink-0"
-                    />
-                  ) : (
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 text-base font-black text-white"
-                      style={{ backgroundColor: ECOLORS[s.emotion] }}
-                    >
-                      {cap(s.emotion).charAt(0)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6">
+              {patients.slice(0, 6).map(p => {
+                const lastSketch = sketches.find(s => s.patient_id === p.id);
+                const sketchCount = p.total_sketches ?? 0;
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => navigate(`/dashboard/children/${p.id}`)}
+                    className="border border-gray-100 rounded-xl p-4 hover:shadow-md hover:border-gray-200 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0 ${
+                          p.gender === "Female" ? "bg-pink-400" : "bg-blue-400"
+                        }`}
+                      >
+                        {p.full_name.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{p.full_name}</p>
+                        <p className="text-xs text-gray-400">
+                          {p.age} y/o · {sketchCount} {sketchCount === 1 ? "sketch" : "sketches"}
+                        </p>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
-                      {s.patient_name ?? "Unknown"}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-0.5">
-                      {new Date(s.created_at).toLocaleDateString("en-MY", {
-                        day: "numeric", month: "short", year: "numeric",
-                      })}
-                    </p>
+                    {lastSketch ? (
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                        <EmotionIcon emotion={lastSketch.emotion} size={15} />
+                        <span className="text-sm font-medium" style={{ color: ECOLORS[lastSketch.emotion] }}>
+                          {cap(lastSketch.emotion)}
+                        </span>
+                        <span className="text-xs text-gray-400 ml-auto">{timeAgo(lastSketch.created_at)}</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 pt-2 border-t border-gray-50">No sessions yet</p>
+                    )}
                   </div>
+                );
+              })}
+            </div>
+          )}
 
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="px-3 py-1 rounded-full text-xs font-semibold text-white shrink-0"
-                      style={{ backgroundColor: ECOLORS[s.emotion] }}
-                    >
-                      {cap(s.emotion)}
-                    </span>
-                    <span className="text-xs text-gray-400 shrink-0">{timeAgo(s.created_at)}</span>
-                  </div>
-                </div>
-              ))}
+          {patients.length > 6 && (
+            <div className="px-6 pb-5">
+              <button
+                onClick={() => navigate("/dashboard/children")}
+                className="w-full text-sm text-gray-500 hover:text-[#e13d7d] font-medium py-2.5 border border-dashed border-gray-200 rounded-xl hover:border-pink-300 transition-colors"
+              >
+                +{patients.length - 6} more — View all children
+              </button>
             </div>
           )}
         </div>
 
         {/* Right column */}
         <div className="flex flex-col gap-6">
+
+          {/* Calendar widget */}
+          <CalendarWidget />
 
           {/* Emotion breakdown */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -373,53 +398,6 @@ export default function Dashboard() {
                         />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Children quick list */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">
-                {role === "user" ? "My Children" : "Children"}
-              </h2>
-              <button
-                onClick={() => navigate("/dashboard/children")}
-                className="text-sm text-[#e13d7d] font-medium hover:underline"
-              >
-                See all
-              </button>
-            </div>
-
-            {patients.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">No children found</p>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {patients.slice(0, 5).map(p => {
-                  const lastSketch = sketches.find(s => s.patient_id === p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => navigate(`/dashboard/children/${p.id}`)}
-                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
-                          p.gender === "Female" ? "bg-pink-400" : "bg-blue-400"
-                        }`}
-                      >
-                        {p.full_name.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{p.full_name}</p>
-                        <p className="text-xs text-gray-400">{p.age} y/o · {p.total_sketches ?? 0} sketches</p>
-                      </div>
-                      {lastSketch && (
-                        <EmotionIcon emotion={lastSketch.emotion} size={22} />
-                      )}
-                    </button>
                   );
                 })}
               </div>
@@ -460,11 +438,15 @@ function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl border border-gray-200 p-5 shadow-sm ${onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}`}
+      className={`bg-white rounded-xl border border-gray-200 px-5 py-4 shadow-sm flex items-center gap-4 ${onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}`}
     >
-      <div className={`inline-flex p-2 rounded-lg ${bg} ${text} mb-3`}>{icon}</div>
-      <p className="text-sm text-gray-500 font-medium">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      <div className={`w-11 h-11 rounded-xl ${bg} ${text} flex items-center justify-center flex-shrink-0`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+      </div>
     </div>
   );
 }

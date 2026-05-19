@@ -21,6 +21,7 @@ import TherapistAnalytics from "./pages/TherapistAnalytics";
 import TherapistList from "./pages/TherapistList";
 import TherapistProfile from "./pages/TherapistProfile";
 import Settings from "./pages/Settings";
+import CalendarPage from "./pages/CalendarPage";
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
           <Route path="users/add" element={<AddUser />} />
           <Route path="users/edit/:id" element={<EditUser />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="calendar" element={<CalendarPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

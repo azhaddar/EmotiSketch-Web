@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { Bell, MessageSquare, PenLine, AlertCircle, UserCheck } from "lucide-react";
+import { Bell, MessageSquare, PenLine, AlertCircle, UserCheck, CalendarDays } from "lucide-react";
 
 interface NotifItem {
   id: string;
-  type: "message" | "drawing" | "profile" | "assigned";
+  type: "message" | "drawing" | "profile" | "assigned" | "calendar_event";
   title: string;
   desc: string;
   time: string;
@@ -14,10 +14,11 @@ interface NotifItem {
 }
 
 const TYPE_CONFIG = {
-  message:  { icon: MessageSquare, color: "text-[#e13d7d]", bg: "bg-pink-100" },
-  drawing:  { icon: PenLine,       color: "text-purple-600", bg: "bg-purple-100" },
-  profile:  { icon: AlertCircle,   color: "text-amber-600",  bg: "bg-amber-100" },
-  assigned: { icon: UserCheck,     color: "text-green-600",  bg: "bg-green-100" },
+  message:        { icon: MessageSquare, color: "text-[#e13d7d]", bg: "bg-pink-100"   },
+  drawing:        { icon: PenLine,       color: "text-purple-600", bg: "bg-purple-100" },
+  profile:        { icon: AlertCircle,   color: "text-amber-600",  bg: "bg-amber-100"  },
+  assigned:       { icon: UserCheck,     color: "text-green-600",  bg: "bg-green-100"  },
+  calendar_event: { icon: CalendarDays,  color: "text-blue-600",   bg: "bg-blue-100"   },
 };
 
 function relativeTime(iso: string) {
@@ -213,6 +214,52 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
           });
         }
       }
+    }
+
+    // ── 5. Calendar event reminders (today + tomorrow) ─────────────────────
+    const now2       = new Date();
+    const in48h      = new Date(now2.getTime() + 48 * 3600 * 1000).toISOString();
+
+    const { data: ownEvts } = await supabase
+      .from("calendar_events")
+      .select("id, title, start_at, all_day, type")
+      .eq("created_by", myId)
+      .gte("start_at", now2.toISOString())
+      .lte("start_at", in48h)
+      .order("start_at");
+
+    const { data: invEvts } = await supabase
+      .from("event_invitations")
+      .select("event_id, calendar_events(id, title, start_at, all_day, type)")
+      .eq("invitee_id", myId)
+      .neq("status", "declined");
+
+    const invitedUpcoming = (invEvts ?? [])
+      .map((inv: any) => inv.calendar_events)
+      .filter(Boolean)
+      .filter((e: any) => e.start_at >= now2.toISOString() && e.start_at <= in48h);
+
+    const allUpcoming = [...(ownEvts ?? []), ...invitedUpcoming];
+    const seenEvt     = new Set<string>();
+
+    for (const evt of allUpcoming) {
+      if (seenEvt.has(evt.id)) continue;
+      seenEvt.add(evt.id);
+      const evtDate = new Date(evt.start_at);
+      const isToday = evtDate.toDateString() === now2.toDateString();
+      const timeStr = evt.all_day
+        ? "All day"
+        : evtDate.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+
+      notifs.unshift({
+        id:    `event-${evt.id}`,
+        type:  "calendar_event",
+        title: isToday ? `Today: ${evt.title}` : `Tomorrow: ${evt.title}`,
+        desc:  timeStr,
+        time:  evt.start_at,
+        isNew: true,
+        link:  "/dashboard/calendar",
+      });
     }
 
     // Sort newest first, keep profile reminders at bottom

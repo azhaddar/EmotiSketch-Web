@@ -10,6 +10,7 @@ import {
   Users,
   BarChart3,
   GraduationCap,
+  CalendarDays,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { useEffect, useState } from "react";
@@ -97,6 +98,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       path: "/dashboard/users",
       icon: <ShieldUser size={20} />,
       visible: role === "admin",
+    },
+    {
+      name: "Calendar",
+      path: "/dashboard/calendar",
+      icon: <CalendarDays size={20} />,
+      visible: true,
     },
     {
       name: "Settings",
