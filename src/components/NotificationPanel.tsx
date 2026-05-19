@@ -65,7 +65,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
   async function fetchNotifications() {
     setLoading(true);
     const notifs: NotifItem[] = [];
-    const seenUntil = localStorage.getItem("notif_seen_until") ?? "1970-01-01";
+    const seenIds = new Set<string>(JSON.parse(localStorage.getItem("notif_seen_ids") ?? "[]"));
 
     // ── 1. Unread chat messages (all roles) ─────────────────────────────────
     const { data: msgs } = await supabase
@@ -96,7 +96,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
             ? `${senderMsgs.length} unread messages`
             : (msg.content.length > 55 ? msg.content.slice(0, 55) + "…" : msg.content),
           time: msg.created_at,
-          isNew: msg.created_at > seenUntil,
+          isNew: !seenIds.has(`msg-${msg.sender_id}`),
         });
       }
     }
@@ -128,7 +128,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
             title: `${pMap[s.patient_id] ?? "A child"} submitted a drawing`,
             desc: `Detected emotion: ${emo}`,
             time: s.created_at,
-            isNew: s.created_at > seenUntil,
+            isNew: !seenIds.has(`sketch-${s.id}`),
             link: `/dashboard/children`,
           });
         }
@@ -148,7 +148,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
           title: "Complete your therapist profile",
           desc: "Add your qualifications to build trust with parents.",
           time: new Date(0).toISOString(),
-          isNew: true,
+          isNew: !seenIds.has("profile-incomplete"),
           link: `/dashboard/therapists/${myId}`,
         });
       }
@@ -176,7 +176,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
             title: `${count} therapist${count > 1 ? "s" : ""} with incomplete profiles`,
             desc: "Remind therapists to fill in their qualifications.",
             time: new Date(0).toISOString(),
-            isNew: true,
+            isNew: !seenIds.has("admin-incomplete"),
             link: `/dashboard/therapists`,
           });
         }
@@ -209,7 +209,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
             title: `Therapist assigned to ${p.full_name}`,
             desc: `${tMap[p.therapist_id] ?? "A therapist"} is now handling your child's sessions.`,
             time: p.updated_at,
-            isNew: p.updated_at > seenUntil,
+            isNew: !seenIds.has(`assigned-${p.id}`),
             link: `/dashboard/children/${p.id}`,
           });
         }
@@ -257,7 +257,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
         title: isToday ? `Today: ${evt.title}` : `Tomorrow: ${evt.title}`,
         desc:  timeStr,
         time:  evt.start_at,
-        isNew: true,
+        isNew: !seenIds.has(`event-${evt.id}`),
         link:  "/dashboard/calendar",
       });
     }
@@ -274,8 +274,21 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
     setLoading(false);
   }
 
+  function markOneRead(id: string) {
+    const stored = new Set<string>(JSON.parse(localStorage.getItem("notif_seen_ids") ?? "[]"));
+    stored.add(id);
+    localStorage.setItem("notif_seen_ids", JSON.stringify([...stored]));
+    setItems(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, isNew: false } : n);
+      onCountChange(updated.filter(n => n.isNew).length);
+      return updated;
+    });
+  }
+
   function markAllRead() {
-    localStorage.setItem("notif_seen_until", new Date().toISOString());
+    const stored = new Set<string>(JSON.parse(localStorage.getItem("notif_seen_ids") ?? "[]"));
+    items.forEach(n => stored.add(n.id));
+    localStorage.setItem("notif_seen_ids", JSON.stringify([...stored]));
     setItems(prev => prev.map(n => ({ ...n, isNew: false })));
     onCountChange(0);
   }
@@ -314,7 +327,7 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
             return (
               <button
                 key={item.id}
-                onClick={() => { if (item.link) { navigate(item.link); onClose(); } }}
+                onClick={() => { markOneRead(item.id); if (item.link) { navigate(item.link); onClose(); } }}
                 className={`w-full flex items-start gap-3 px-4 py-3 transition-colors text-left ${
                   item.link ? "hover:bg-gray-50 cursor-pointer" : "cursor-default"
                 }`}

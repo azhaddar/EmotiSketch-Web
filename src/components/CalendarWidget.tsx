@@ -37,7 +37,7 @@ export default function CalendarWidget() {
     const { data: own } = await supabase
       .from("calendar_events").select("*")
       .eq("created_by", uid)
-      .gte("start_at", monthStart).lte("start_at", monthEnd);
+      .lte("start_at", monthEnd).gte("end_at", monthStart);
 
     const { data: invs } = await supabase
       .from("event_invitations")
@@ -46,7 +46,7 @@ export default function CalendarWidget() {
 
     const invited = (invs ?? [])
       .map((inv: any) => inv.calendar_events).filter(Boolean)
-      .filter((e: CalEvent) => e.start_at >= monthStart && e.start_at <= monthEnd);
+      .filter((e: CalEvent) => e.start_at <= monthEnd && e.end_at >= monthStart);
 
     const all  = [...(own ?? []), ...invited];
     const seen = new Set<string>();
@@ -65,9 +65,12 @@ export default function CalendarWidget() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   function eventsOn(day: number): CalEvent[] {
+    const dayStart = new Date(year, month, day).getTime();
+    const dayEnd   = new Date(year, month, day, 23, 59, 59, 999).getTime();
     return events.filter(e => {
-      const d = new Date(e.start_at);
-      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+      const start = new Date(e.start_at).getTime();
+      const end   = new Date(e.end_at).getTime();
+      return start <= dayEnd && end >= dayStart;
     });
   }
 

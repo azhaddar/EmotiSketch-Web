@@ -248,7 +248,13 @@ export default function Dashboard() {
             <>
               <StatCard label="My Children" value={patients.length} icon={<Users size={18} />} bg="bg-blue-50" text="text-blue-600" onClick={() => navigate("/dashboard/patients")} />
               <StatCard label="Total Sketches" value={totalSketches} icon={<Brain size={18} />} bg="bg-pink-50" text="text-pink-600" />
-              <StatCard label="This Week" value={weekSketches} icon={<Activity size={18} />} bg="bg-green-50" text="text-green-600" />
+              <StatCard
+                label="Happy Rate"
+                value={totalSketches > 0 ? `${Math.round((emotionCounts.happy / totalSketches) * 100)}%` : "—"}
+                icon={<EmotionIcon emotion="happy" size={18} />}
+                bg="bg-yellow-50"
+                text="text-yellow-600"
+              />
               <StatCard
                 label="Top Emotion"
                 value={dominantEmotion ? cap(dominantEmotion) : "—"}
@@ -370,58 +376,6 @@ export default function Dashboard() {
           {/* Calendar widget */}
           <CalendarWidget />
 
-          {/* Emotion breakdown */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Emotion Breakdown</h2>
-            {totalSketches === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No data yet</p>
-            ) : (
-              <div className="space-y-3">
-                {EMOTIONS.map(e => {
-                  const count = emotionCounts[e];
-                  const pct = Math.round((count / totalSketches) * 100);
-                  return (
-                    <div key={e}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-600 flex items-center gap-2">
-                          <EmotionIcon emotion={e} size={16} />
-                          {cap(e)}
-                        </span>
-                        <span className="text-sm font-semibold text-gray-800">
-                          {count} <span className="font-normal text-gray-400">({pct}%)</span>
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%`, backgroundColor: ECOLORS[e] }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Quick links */}
-          <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl p-5 text-white">
-            <h3 className="font-bold text-lg mb-1">Quick Actions</h3>
-            <p className="text-white/80 text-sm mb-4">Jump to what matters</p>
-            <div className="flex flex-col gap-2">
-              <QuickLink label="Children Progress" onClick={() => navigate("/dashboard/children")} />
-              {(role === "therapist" || role === "admin") && (
-                <QuickLink label="Analytics Dashboard" onClick={() => navigate("/dashboard/analytics")} />
-              )}
-              {role === "admin" && (
-                <QuickLink label="Manage Users" onClick={() => navigate("/dashboard/users")} />
-              )}
-              {(role === "therapist" || role === "admin") && (
-                <QuickLink label="All Children" onClick={() => navigate("/dashboard/patients")} />
-              )}
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
@@ -451,14 +405,3 @@ function StatCard({
   );
 }
 
-function QuickLink({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center justify-between w-full bg-white/15 hover:bg-white/25 transition-colors rounded-lg px-4 py-2.5 text-sm font-medium text-white"
-    >
-      {label}
-      <ChevronRight size={16} />
-    </button>
-  );
-}

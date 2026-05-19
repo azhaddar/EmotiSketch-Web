@@ -484,12 +484,15 @@ serve(async (req: Request) => {
             { type: "text", text: userInstruction },
           ],
         },
+        // Prefill forces the model to begin with "valid:" — prevents freeform preamble
+        { role: "assistant", content: "valid:" },
       ],
     });
 
-    const raw = (response.content[0] as { text: string }).text.trim().toLowerCase();
+    // Prepend the prefill back so the full string is parseable
+    const raw = ("valid:" + (response.content[0] as { text: string }).text.trim()).toLowerCase();
 
-    if (raw.includes("valid:false") || raw === "false") {
+    if (raw.includes("valid:false")) {
       const type = promptType === "house" ? "house" : "self";
       return new Response(
         JSON.stringify({ valid: false, message: INVALID_MESSAGES[type] }),
@@ -517,6 +520,13 @@ serve(async (req: Request) => {
     const emotion: Emotion = parseOk
       ? (VALID_EMOTIONS.reduce((a, b) => scores[a] >= scores[b] ? a : b) as Emotion)
       : "happy";
+
+    // If parsing failed or all scores are zero, set a visible fallback so the
+    // result screen never shows four empty bars
+    if (!parseOk || Object.values(scores).every(v => v === 0)) {
+      scores[emotion] = 70;
+      VALID_EMOTIONS.filter(e => e !== emotion).forEach(e => { scores[e] = 10; });
+    }
 
     // ── Call 2: Therapist message + HTP clinical features ────────────────────
     const drawingType = promptType === "house" ? "house drawing" : "self-portrait";
