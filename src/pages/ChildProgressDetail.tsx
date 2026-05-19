@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { jsPDF } from "jspdf";
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -18,6 +19,7 @@ import {
   X,
   ZoomIn,
   Check,
+  FileDown,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
 
@@ -483,6 +485,147 @@ export default function ChildProgressDetail() {
 
   const activeDays = new Set(sketches.map((s) => new Date(s.created_at).toDateString())).size;
 
+  // ── PDF Export ────────────────────────────────────────────────────────────
+  function exportPDF() {
+    if (!patient) return;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = 210;
+    const pink: [number, number, number] = [225, 61, 125];
+    const dark: [number, number, number] = [17, 24, 39];
+    const gray: [number, number, number] = [107, 114, 128];
+    const light: [number, number, number] = [249, 250, 251];
+
+    // Header bar
+    doc.setFillColor(...pink);
+    doc.rect(0, 0, W, 28, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("EmotiSketch", 14, 12);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Patient Progress Report", 14, 20);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })}`, W - 14, 20, { align: "right" });
+
+    let y = 38;
+
+    // Patient info section
+    doc.setFillColor(...light);
+    doc.roundedRect(14, y, W - 28, 34, 3, 3, "F");
+    doc.setTextColor(...dark);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(patient.full_name, 22, y + 9);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...gray);
+    doc.text(`Age: ${patient.age}  ·  Gender: ${patient.gender}  ·  Status: ${patient.status ?? "N/A"}`, 22, y + 17);
+    if (patient.guardian?.full_name) doc.text(`Parent / Guardian: ${patient.guardian.full_name}`, 22, y + 24);
+    if (patient.therapist?.full_name) doc.text(`Assigned Therapist: ${patient.therapist.full_name}`, 22, y + 31);
+    y += 42;
+
+    // Emotion summary
+    doc.setTextColor(...dark);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Emotion Summary", 14, y);
+    y += 6;
+
+    const total = sketches.length;
+    const emoColors: Record<string, [number, number, number]> = {
+      happy:   [245, 158, 11],
+      sad:     [59, 130, 246],
+      angry:   [239, 68, 68],
+      anxious: [139, 92, 246],
+    };
+
+    Object.entries(emotionCounts).forEach(([emo, count]) => {
+      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+      const barW = total > 0 ? ((count / total) * 100) : 0;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...gray);
+      doc.text(`${emo.charAt(0).toUpperCase() + emo.slice(1)}`, 22, y + 4);
+      doc.setFillColor(229, 231, 235);
+      doc.roundedRect(50, y, 100, 5, 2, 2, "F");
+      if (barW > 0) {
+        doc.setFillColor(...(emoColors[emo] ?? [156, 163, 175]));
+        doc.roundedRect(50, y, barW, 5, 2, 2, "F");
+      }
+      doc.setTextColor(...dark);
+      doc.text(`${count} (${pct}%)`, 155, y + 4);
+      y += 9;
+    });
+
+    y += 4;
+
+    // Sessions table
+    doc.setTextColor(...dark);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Session History", 14, y);
+    y += 6;
+
+    // Table header
+    doc.setFillColor(...pink);
+    doc.rect(14, y, W - 28, 7, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", 17, y + 5);
+    doc.text("Date & Time", 26, y + 5);
+    doc.text("Emotion", 78, y + 5);
+    doc.text("Parent Note", 110, y + 5);
+    doc.text("Therapist Note", 158, y + 5);
+    y += 7;
+
+    const rows = sketches.slice(0, 30);
+    rows.forEach((s, i) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      const rowBg: [number, number, number] = i % 2 === 0 ? [255, 255, 255] : [249, 250, 251];
+      doc.setFillColor(...rowBg);
+      doc.rect(14, y, W - 28, 8, "F");
+      doc.setTextColor(...gray);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      const dateStr = new Date(s.created_at).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
+      const timeStr = new Date(s.created_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+      doc.text(`${total - i}`, 17, y + 5.5);
+      doc.text(`${dateStr} ${timeStr}`, 26, y + 5.5);
+      doc.setTextColor(...(emoColors[s.emotion] ?? dark));
+      doc.setFont("helvetica", "bold");
+      doc.text(s.emotion.charAt(0).toUpperCase() + s.emotion.slice(1), 78, y + 5.5);
+      doc.setTextColor(...gray);
+      doc.setFont("helvetica", "normal");
+      const parentNote = s.notes ? doc.splitTextToSize(s.notes, 38)[0] : "—";
+      const therapistNote = s.therapist_notes ? doc.splitTextToSize(s.therapist_notes, 38)[0] : "—";
+      doc.text(parentNote, 110, y + 5.5);
+      doc.text(therapistNote, 158, y + 5.5);
+      y += 8;
+    });
+
+    if (sketches.length > 30) {
+      doc.setFontSize(8);
+      doc.setTextColor(...gray);
+      doc.text(`... and ${sketches.length - 30} more sessions`, 14, y + 5);
+    }
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7);
+      doc.setTextColor(...gray);
+      doc.text("EmotiSketch — Confidential Patient Report", 14, 292);
+      doc.text(`Page ${p} of ${pageCount}`, W - 14, 292, { align: "right" });
+    }
+
+    doc.save(`EmotiSketch_${patient.full_name.replace(/\s+/g, "_")}_Report.pdf`);
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -603,9 +746,18 @@ export default function ChildProgressDetail() {
           </div>
         </div>
 
-        <div className="text-right flex-shrink-0">
-          <p className="text-3xl font-bold text-gray-900">{patient.total_sketches ?? 0}</p>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Total Sketches</p>
+        <div className="flex flex-col items-end gap-3 flex-shrink-0">
+          <div className="text-right">
+            <p className="text-3xl font-bold text-gray-900">{patient.total_sketches ?? 0}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide">Total Sketches</p>
+          </div>
+          <button
+            onClick={exportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-[#e13d7d] hover:bg-pink-600 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <FileDown size={15} />
+            Export PDF
+          </button>
         </div>
       </div>
 
