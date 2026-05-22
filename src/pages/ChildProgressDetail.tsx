@@ -59,6 +59,9 @@ interface Sketch {
   angry?: number | null;
   anxious?: number | null;
   scores?: Record<string, number> | null;
+  status?: 'submitted' | 'reviewing' | 'verified' | null;
+  reviewed_at?: string | null;
+  verified_at?: string | null;
   [key: string]: unknown;
 }
 
@@ -325,6 +328,7 @@ export default function ChildProgressDetail() {
   const [therapistSaved, setTherapistSaved] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusSaved, setStatusSaved] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (id) fetchData(id);
@@ -448,6 +452,30 @@ export default function ChildProgressDetail() {
       alert("Failed to assign therapist. Please try again.");
     } finally {
       setAssigningTherapist(false);
+    }
+  }
+
+  async function updateSketchStatus(newStatus: "reviewing" | "verified") {
+    if (!selectedSketch) return;
+    setVerifying(true);
+    try {
+      const now = new Date().toISOString();
+      const extra = newStatus === "reviewing"
+        ? { reviewed_at: now }
+        : { verified_at: now };
+      const { error } = await supabase
+        .from("sketches")
+        .update({ status: newStatus, ...extra })
+        .eq("id", selectedSketch.id);
+      if (error) throw error;
+      const patch = { status: newStatus, ...extra };
+      setSketches(prev => prev.map(s => s.id === selectedSketch.id ? { ...s, ...patch } : s));
+      setSelectedSketch(prev => prev ? { ...prev, ...patch } : prev);
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -1089,9 +1117,16 @@ export default function ChildProgressDetail() {
                           })}
                         </span>
                       </div>
-                      <span className="text-[11px] font-bold text-gray-500 group-hover:text-[#e13d7d] transition-colors flex items-center gap-1">
-                        <ZoomIn size={12} /> View
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {sketch.status === "verified" && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            <Check size={9} /> Verified
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold text-gray-500 group-hover:text-[#e13d7d] transition-colors flex items-center gap-1">
+                          <ZoomIn size={12} /> View
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1311,6 +1346,33 @@ export default function ChildProgressDetail() {
                             ? <><Loader2 size={14} className="animate-spin" /> Saving...</>
                             : <><Check size={14} /> Save Note</>}
                         </button>
+
+                        {/* Status progression button */}
+                        {selectedSketch.status === "verified" ? (
+                          <div className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center gap-2 cursor-default">
+                            <Check size={14} /> Verified
+                          </div>
+                        ) : selectedSketch.status === "reviewing" ? (
+                          <button
+                            onClick={() => updateSketchStatus("verified")}
+                            disabled={verifying}
+                            className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                          >
+                            {verifying
+                              ? <><Loader2 size={14} className="animate-spin" /> Updating...</>
+                              : <><Check size={14} /> Mark as Verified</>}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => updateSketchStatus("reviewing")}
+                            disabled={verifying}
+                            className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                          >
+                            {verifying
+                              ? <><Loader2 size={14} className="animate-spin" /> Updating...</>
+                              : <><Check size={14} /> Set to In Review</>}
+                          </button>
+                        )}
                       </>
                     ) : selectedSketch.therapist_notes ? (
                       <p className="text-sm text-gray-700 leading-relaxed">{selectedSketch.therapist_notes}</p>

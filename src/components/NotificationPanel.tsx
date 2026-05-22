@@ -114,23 +114,35 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
 
         const { data: sketches } = await supabase
           .from("sketches")
-          .select("id, emotion, created_at, patient_id")
+          .select("id, emotion, created_at, patient_id, status")
           .in("patient_id", patients.map(p => p.id))
           .gte("created_at", since7d)
           .order("created_at", { ascending: false })
-          .limit(15);
+          .limit(20);
 
         for (const s of sketches ?? []) {
           const emo = s.emotion.charAt(0).toUpperCase() + s.emotion.slice(1);
-          notifs.push({
-            id: `sketch-${s.id}`,
-            type: "drawing",
-            title: `${pMap[s.patient_id] ?? "A child"} submitted a drawing`,
-            desc: `Detected emotion: ${emo}`,
-            time: s.created_at,
-            isNew: !seenIds.has(`sketch-${s.id}`),
-            link: `/dashboard/children`,
-          });
+          if (!s.status || s.status === "submitted") {
+            notifs.push({
+              id: `sketch-${s.id}`,
+              type: "drawing",
+              title: `${pMap[s.patient_id] ?? "A child"} submitted a drawing`,
+              desc: `Emotion: ${emo} · Awaiting your review`,
+              time: s.created_at,
+              isNew: !seenIds.has(`sketch-${s.id}`),
+              link: `/dashboard/children`,
+            });
+          } else if (s.status === "reviewing") {
+            notifs.push({
+              id: `reviewing-${s.id}`,
+              type: "drawing",
+              title: `Review in progress — ${pMap[s.patient_id] ?? "A child"}`,
+              desc: `You marked this drawing as in review.`,
+              time: s.created_at,
+              isNew: !seenIds.has(`reviewing-${s.id}`),
+              link: `/dashboard/children`,
+            });
+          }
         }
       }
 
