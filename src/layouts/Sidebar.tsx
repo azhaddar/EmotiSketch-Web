@@ -33,22 +33,25 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user) {
-        setUserEmail(user.email ?? "");
+      if (!user) return;
+      setUserEmail(user.email ?? "");
 
-        const { data } = await supabase
-          .from("profiles")
-          .select("full_name, email, role")
-          .eq("id", user.id)
-          .single();
+      let { data } = await supabase
+        .from("profiles")
+        .select("full_name, email, role")
+        .eq("id", user.id)
+        .maybeSingle();
 
-        if (data) {
-          console.log("Detected Role:", data.role); // Debugging
-          setFullName(data.full_name || "User");
-          // Store role in lowercase to avoid "User" vs "user" bugs
-          setRole((data.role || "").toLowerCase());
-        }
+      if (!data || !data.full_name) {
+        // Profile missing or name empty — read from auth metadata directly
+        const meta = user.user_metadata ?? {};
+        setFullName(meta.full_name || "User");
+        setRole((data?.role || meta.role || "parent").toLowerCase());
+        return;
       }
+
+      setFullName(data.full_name || "User");
+      setRole((data.role || "").toLowerCase());
     };
 
     getProfileName();
@@ -70,16 +73,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
     {
       name: "Add Child",
-      path: "/dashboard/patients/add", // Reusing the existing page
+      path: "/dashboard/patients/add",
       icon: <UserPlus size={20} />,
-      visible: role === "user", // Only visible to Parents
+      visible: role === "parent" || role === "user",
     },
     {
-      name: "Children Progress", // This is the "Patient Progress" you mentioned
+      name: "Children Progress",
       path: "/dashboard/children",
       icon: <ChartNoAxesCombined size={20} />,
-      // FIX: Now visible to User (Parent), Therapist, AND Admin
-      visible: role === "user" || role === "therapist" || role === "admin",
+      visible: role === "parent" || role === "user" || role === "therapist" || role === "admin",
     },
     {
       name: "Analytics",
@@ -91,7 +93,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       name: "Therapists",
       path: "/dashboard/therapists",
       icon: <GraduationCap size={20} />,
-      visible: role === "admin" || role === "therapist" || role === "user",
+      visible: role === "parent" || role === "user" || role === "admin" || role === "therapist",
     },
     {
       name: "Users",

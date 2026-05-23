@@ -22,6 +22,8 @@ import {
   FileDown,
   CalendarPlus,
   Send,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
 
@@ -65,6 +67,15 @@ interface Sketch {
   reviewed_at?: string | null;
   verified_at?: string | null;
   [key: string]: unknown;
+}
+
+interface ChildEvent {
+  id: string;
+  child_id: string;
+  title: string;
+  description?: string | null;
+  event_type: string;
+  scheduled_at: string;
 }
 
 const EMOTIONS: Record<string, { label: string; color: string; bg: string; text: string; ring: string }> = {
@@ -310,6 +321,219 @@ function InsightBanner({ sketches }: { sketches: Sketch[] }) {
   );
 }
 
+// ── Calendar view ─────────────────────────────────────────────────────────────
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+const CAL_EVENT_COLORS: Record<string, string> = {
+  appointment: "#10B981",
+  homework_prompt: "#F59E0B",
+  check_in: "#3B82F6",
+};
+const CAL_EVENT_LABELS: Record<string, string> = {
+  appointment: "Appointment",
+  homework_prompt: "Homework",
+  check_in: "Check-in",
+};
+
+function CalendarGridView({
+  sketches,
+  childEvents,
+  calendarMonth,
+  onMonthChange,
+  selectedDay,
+  onDaySelect,
+  onSketchClick,
+}: {
+  sketches: Sketch[];
+  childEvents: ChildEvent[];
+  calendarMonth: { year: number; month: number };
+  onMonthChange: (m: { year: number; month: number }) => void;
+  selectedDay: string | null;
+  onDaySelect: (day: string | null) => void;
+  onSketchClick: (s: Sketch) => void;
+}) {
+  const { year, month } = calendarMonth;
+  const today = new Date().toISOString().split("T")[0];
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const fmtDay = (d: number) =>
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  const prevMonth = () =>
+    onMonthChange(month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 });
+  const nextMonth = () =>
+    onMonthChange(month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 });
+
+  const dayMarks: Record<string, { emotions: string[]; hasEvent: boolean }> = {};
+  sketches.forEach(s => {
+    const d = s.created_at.slice(0, 10);
+    if (!dayMarks[d]) dayMarks[d] = { emotions: [], hasEvent: false };
+    if (!dayMarks[d].emotions.includes(s.emotion)) dayMarks[d].emotions.push(s.emotion);
+  });
+  childEvents.forEach(ev => {
+    const d = ev.scheduled_at.slice(0, 10);
+    if (!dayMarks[d]) dayMarks[d] = { emotions: [], hasEvent: false };
+    dayMarks[d].hasEvent = true;
+  });
+
+  const daySketchList = selectedDay ? sketches.filter(s => s.created_at.slice(0, 10) === selectedDay) : [];
+  const dayEventList  = selectedDay ? childEvents.filter(ev => ev.scheduled_at.slice(0, 10) === selectedDay) : [];
+  const selectedDateLabel = selectedDay
+    ? new Date(selectedDay + "T00:00:00").toLocaleDateString("en-MY", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      })
+    : null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <ChevronLeft size={16} />
+        </button>
+        <h2 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h2>
+        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+          <div key={d} className="text-center text-[11px] text-gray-400 font-semibold py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const ds = fmtDay(day);
+          const mark = dayMarks[ds];
+          const isToday = ds === today;
+          const isSelected = ds === selectedDay;
+          return (
+            <button
+              key={i}
+              onClick={() => onDaySelect(isSelected ? null : ds)}
+              className={`min-h-[44px] flex flex-col items-center justify-start pt-1.5 pb-1 rounded-xl text-xs font-semibold transition-all ${
+                isSelected
+                  ? "bg-[#1A1F3C] text-white"
+                  : isToday
+                  ? "bg-pink-50 text-[#e13d7d] ring-1 ring-[#e13d7d]"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {day}
+              {mark && (
+                <div className="flex gap-0.5 mt-1 flex-wrap justify-center">
+                  {mark.emotions.slice(0, 3).map(e => (
+                    <span
+                      key={e}
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: EMOTIONS[e]?.color ?? "#d1d5db" }}
+                    />
+                  ))}
+                  {mark.hasEvent && (
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-500" />
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100">
+        {Object.entries(EMOTIONS).map(([key, e]) => (
+          <div key={key} className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: e.color }} />
+            {e.label}
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+          <span className="w-2 h-2 rounded-full flex-shrink-0 bg-emerald-500" />
+          Scheduled Event
+        </div>
+      </div>
+
+      {/* Day detail */}
+      {selectedDay && (
+        <div className="mt-5 border-t border-gray-100 pt-5">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{selectedDateLabel}</p>
+          {daySketchList.length === 0 && dayEventList.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-3">Nothing recorded on this day</p>
+          ) : (
+            <div className="space-y-2">
+              {dayEventList.map(ev => (
+                <div key={ev.id} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: (CAL_EVENT_COLORS[ev.event_type] ?? "#10B981") + "22" }}
+                  >
+                    <Calendar size={14} style={{ color: CAL_EVENT_COLORS[ev.event_type] ?? "#10B981" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">{ev.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {CAL_EVENT_LABELS[ev.event_type] ?? ev.event_type}
+                      {" · "}
+                      {new Date(ev.scheduled_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
+                  </div>
+                </div>
+              ))}
+              {daySketchList.map(sk => {
+                const e = EMOTIONS[sk.emotion];
+                return (
+                  <button
+                    key={sk.id}
+                    onClick={() => onSketchClick(sk)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: (e?.color ?? "#d1d5db") + "22" }}
+                    >
+                      <EmotionIcon emotion={sk.emotion} size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">Drawing session</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        <span style={{ color: e?.color }}>{e?.label}</span>
+                        {" · "}
+                        {new Date(sk.created_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    {sk.image_url && (
+                      <img
+                        src={sk.image_url}
+                        alt={e?.label}
+                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ChildProgressDetail() {
   const { id } = useParams<{ id: string }>();
@@ -331,6 +555,15 @@ export default function ChildProgressDetail() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusSaved, setStatusSaved] = useState(false);
   const [verifying, setVerifying] = useState(false);
+
+  // ── Analytics / Calendar toggle ───────────────────────────────────────────
+  const [analyticsView, setAnalyticsView] = useState<"analytics" | "calendar">("analytics");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [calendarSelectedDay, setCalendarSelectedDay] = useState<string | null>(null);
+  const [childEvents, setChildEvents] = useState<ChildEvent[]>([]);
 
   // ── Schedule event modal ───────────────────────────────────────────────────
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -392,6 +625,13 @@ export default function ChildProgressDetail() {
         .order("created_at", { ascending: false });
 
       setSketches(sketchData || []);
+
+      const { data: eventsData } = await supabase
+        .from("child_events")
+        .select("id, child_id, title, description, event_type, scheduled_at")
+        .eq("child_id", patientId)
+        .order("scheduled_at", { ascending: true });
+      setChildEvents(eventsData || []);
     } catch (err) {
       console.error("Error loading child details:", err);
     } finally {
@@ -918,6 +1158,37 @@ export default function ChildProgressDetail() {
         ))}
       </div>
 
+      {/* View Toggle */}
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-5">
+        {(["analytics", "calendar"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setAnalyticsView(v)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all ${
+              analyticsView === v
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+
+      {analyticsView === "calendar" && (
+        <CalendarGridView
+          sketches={sketches}
+          childEvents={childEvents}
+          calendarMonth={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          selectedDay={calendarSelectedDay}
+          onDaySelect={setCalendarSelectedDay}
+          onSketchClick={setSelectedSketch}
+        />
+      )}
+
+      {analyticsView === "analytics" && (
+      <>
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Donut Chart */}
@@ -1082,6 +1353,9 @@ export default function ChildProgressDetail() {
           </div>
         );
       })()}
+
+      </>
+      )}
 
       {/* All Sessions — Photo Gallery */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">

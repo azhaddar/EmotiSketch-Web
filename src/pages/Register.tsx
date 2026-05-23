@@ -25,6 +25,7 @@ const Register: React.FC = () => {
       options: {
         data: {
           full_name: fullName,
+          role: 'parent',
         },
       },
     });
