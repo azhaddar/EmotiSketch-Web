@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { X, Search, UserPlus, Trash2, MapPin, FileText } from "lucide-react";
+import { X, Search, UserPlus, Trash2, MapPin, FileText, Check } from "lucide-react";
 import { EVENT_TYPES, CalEvent, Guest } from "../lib/calendarTypes";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -39,6 +39,8 @@ export default function EventModal({ open, onClose, initialDate, editEvent, myId
   const [searchResults,  setSearchResults]  = useState<Guest[]>([]);
   const [guests,         setGuests]         = useState<Guest[]>([]);
 
+  const [myStatus, setMyStatus] = useState<string | null>(null);
+
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error,    setError]    = useState("");
@@ -55,15 +57,15 @@ export default function EventModal({ open, onClose, initialDate, editEvent, myId
       .select("invitee_id, status, profiles:invitee_id(full_name, email, role)")
       .eq("event_id", eventId);
 
-    setGuests(
-      (data ?? []).map((inv: any) => ({
-        id: inv.invitee_id,
-        full_name: inv.profiles?.full_name ?? "",
-        email:     inv.profiles?.email     ?? "",
-        role:      inv.profiles?.role      ?? "",
-        status:    inv.status,
-      }))
-    );
+    const list = (data ?? []).map((inv: any) => ({
+      id:        inv.invitee_id,
+      full_name: inv.profiles?.full_name ?? "",
+      email:     inv.profiles?.email     ?? "",
+      role:      inv.profiles?.role      ?? "",
+      status:    inv.status,
+    }));
+    setGuests(list);
+    setMyStatus(list.find(g => g.id === myId)?.status ?? null);
   }
 
   useEffect(() => {
@@ -156,6 +158,37 @@ export default function EventModal({ open, onClose, initialDate, editEvent, myId
       .update({ status, responded_at: new Date().toISOString() })
       .eq("event_id", editEvent.id)
       .eq("invitee_id", myId);
+
+    // Update local state immediately so buttons hide without waiting for re-fetch
+    setMyStatus(status);
+    setGuests(prev => prev.map(g => g.id === myId ? { ...g, status } : g));
+
+    // Push-notify the event creator on their mobile app
+    try {
+      const [{ data: me }, { data: evt }] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", myId).single(),
+        supabase.from("calendar_events").select("created_by, title").eq("id", editEvent.id).single(),
+      ]);
+      if (evt?.created_by) {
+        const { data: creator } = await supabase
+          .from("profiles").select("expo_push_token").eq("id", evt.created_by).single();
+        const token = (creator as any)?.expo_push_token as string | null;
+        if (token) {
+          await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({
+              to:    token,
+              title: `${(me as any)?.full_name ?? "Someone"} ${status} your invitation`,
+              body:  evt.title,
+              data:  { screen: "calendar", selectedDate: editEvent.start_at.split("T")[0] },
+              sound: "default",
+            }),
+          });
+        }
+      }
+    } catch {}
+
     onSaved();
   }
 
@@ -382,22 +415,37 @@ export default function EventModal({ open, onClose, initialDate, editEvent, myId
             </button>
           )}
 
-          {/* Invite response buttons for non-owner */}
+          {/* Invite response — non-owner */}
           {isEdit && !isOwner && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => respondInvite("accepted")}
-                className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-xl hover:bg-green-600 transition-colors"
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => respondInvite("declined")}
-                className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-              >
-                Decline
-              </button>
-            </div>
+            myStatus === "accepted" || myStatus === "declined" ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
+                {myStatus === "accepted"
+                  ? <><Check size={14} className="text-green-500 flex-shrink-0" /><span className="text-sm font-semibold text-green-700">You accepted</span></>
+                  : <><X    size={14} className="text-red-400  flex-shrink-0" /><span className="text-sm font-semibold text-red-600">You declined</span></>
+                }
+                <button
+                  onClick={() => respondInvite(myStatus === "accepted" ? "declined" : "accepted")}
+                  className="ml-1 text-xs text-gray-400 hover:text-gray-600 underline"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => respondInvite("accepted")}
+                  className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-xl hover:bg-green-600 transition-colors"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => respondInvite("declined")}
+                  className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Decline
+                </button>
+              </div>
+            )
           )}
 
           <div className="flex gap-2 ml-auto">

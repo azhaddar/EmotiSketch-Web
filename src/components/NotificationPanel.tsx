@@ -228,7 +228,65 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
       }
     }
 
-    // ── 5. Calendar event reminders (today + tomorrow) ─────────────────────
+    // ── 5. Pending event invitations (you were invited, haven't responded) ───
+    const { data: pendingInvites } = await supabase
+      .from("event_invitations")
+      .select("event_id, created_at, calendar_events(id, title, start_at)")
+      .eq("invitee_id", myId)
+      .eq("status", "pending");
+
+    for (const inv of pendingInvites ?? []) {
+      const evt = (inv as any).calendar_events;
+      if (!evt) continue;
+      const dateLabel = new Date(evt.start_at).toLocaleDateString("en-MY", {
+        weekday: "short", day: "numeric", month: "short",
+      });
+      notifs.push({
+        id:    `invite-${inv.event_id}`,
+        type:  "calendar_event",
+        title: "You have a new event invitation",
+        desc:  `${evt.title} · ${dateLabel}`,
+        time:  inv.created_at,
+        isNew: !seenIds.has(`invite-${inv.event_id}`),
+        link:  "/dashboard/calendar",
+      });
+    }
+
+    // ── 6. RSVP responses to events you created (last 3 days) ─────────────
+    const since3d = new Date(Date.now() - 3 * 24 * 3600000).toISOString();
+    const { data: myEvts } = await supabase
+      .from("calendar_events")
+      .select("id, title")
+      .eq("created_by", myId);
+
+    if (myEvts?.length) {
+      const evtMap: Record<string, string> = {};
+      myEvts.forEach(e => { evtMap[e.id] = e.title; });
+
+      const { data: responses } = await supabase
+        .from("event_invitations")
+        .select("event_id, invitee_id, status, responded_at, profiles:invitee_id(full_name)")
+        .in("event_id", myEvts.map(e => e.id))
+        .in("status", ["accepted", "declined"])
+        .not("responded_at", "is", null)
+        .gte("responded_at", since3d)
+        .order("responded_at", { ascending: false });
+
+      for (const r of responses ?? []) {
+        const name = (r as any).profiles?.full_name ?? "Someone";
+        notifs.push({
+          id:    `rsvp-${r.event_id}-${r.invitee_id}`,
+          type:  "calendar_event",
+          title: `${name} ${r.status} your invitation`,
+          desc:  evtMap[r.event_id] ?? "an event",
+          time:  r.responded_at!,
+          isNew: !seenIds.has(`rsvp-${r.event_id}-${r.invitee_id}`),
+          link:  "/dashboard/calendar",
+        });
+      }
+    }
+
+    // ── 7. Calendar event reminders (today + tomorrow) ─────────────────────
     const now2       = new Date();
     const in48h      = new Date(now2.getTime() + 48 * 3600 * 1000).toISOString();
 

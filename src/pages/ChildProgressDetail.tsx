@@ -20,6 +20,8 @@ import {
   ZoomIn,
   Check,
   FileDown,
+  CalendarPlus,
+  Send,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
 
@@ -330,6 +332,19 @@ export default function ChildProgressDetail() {
   const [statusSaved, setStatusSaved] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  // ── Schedule event modal ───────────────────────────────────────────────────
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [schedulingEvent, setSchedulingEvent]     = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    title: '',
+    event_type: 'appointment' as 'appointment' | 'homework_prompt' | 'check_in',
+    date: new Date().toISOString().split('T')[0],
+    time: '10:00',
+    description: '',
+    send_notification: true,
+  });
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
+
   useEffect(() => {
     if (id) fetchData(id);
   }, [id]);
@@ -498,6 +513,64 @@ export default function ChildProgressDetail() {
       alert("Failed to save note. Please try again.");
     } finally {
       setSavingNote(false);
+    }
+  }
+
+  async function createEvent() {
+    if (!patient || !scheduleForm.title.trim()) return;
+    setSchedulingEvent(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const scheduled_at = new Date(`${scheduleForm.date}T${scheduleForm.time}`).toISOString();
+      const { error } = await supabase.from("child_events").insert({
+        child_id:     patient.id,
+        therapist_id: user.id,
+        title:        scheduleForm.title.trim(),
+        description:  scheduleForm.description.trim() || null,
+        event_type:   scheduleForm.event_type,
+        scheduled_at,
+      });
+      if (error) throw error;
+
+      if (scheduleForm.send_notification) {
+        const { data: guardianProfile } = await supabase
+          .from("profiles")
+          .select("expo_push_token")
+          .eq("id", patient.guardian_id)
+          .single();
+
+        const token = (guardianProfile as any)?.expo_push_token as string | null;
+        if (token) {
+          const dateLabel = new Date(scheduled_at).toLocaleDateString("en-MY", {
+            weekday: "short", day: "numeric", month: "short",
+          });
+          await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({
+              to:    token,
+              title: `New event for ${patient.full_name.split(" ")[0]}`,
+              body:  `${scheduleForm.title.trim()} on ${dateLabel}`,
+              data:  { screen: "calendar", selectedDate: scheduleForm.date, childId: patient.id },
+              sound: "default",
+            }),
+          });
+        }
+      }
+
+      setScheduleSuccess(true);
+      setTimeout(() => {
+        setShowScheduleModal(false);
+        setScheduleSuccess(false);
+        setScheduleForm(f => ({ ...f, title: '', description: '', send_notification: true }));
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to create event:", err);
+      alert("Failed to create event. Please try again.");
+    } finally {
+      setSchedulingEvent(false);
     }
   }
 
@@ -779,13 +852,24 @@ export default function ChildProgressDetail() {
             <p className="text-3xl font-bold text-gray-900">{patient.total_sketches ?? 0}</p>
             <p className="text-xs text-gray-400 uppercase tracking-wide">Total Sketches</p>
           </div>
-          <button
-            onClick={exportPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-[#e13d7d] hover:bg-pink-600 text-white text-sm font-semibold rounded-xl transition-colors"
-          >
-            <FileDown size={15} />
-            Export PDF
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-[#e13d7d] hover:bg-pink-600 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              <FileDown size={15} />
+              Export PDF
+            </button>
+            {(role === "therapist" || role === "admin") && (
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <CalendarPlus size={15} />
+                Schedule Event
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1435,6 +1519,144 @@ export default function ChildProgressDetail() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Therapy Notes</h2>
           <p className="text-sm text-gray-600 leading-relaxed">{patient.personality}</p>
+        </div>
+      )}
+
+      {/* ── Schedule Event Modal ── */}
+      {showScheduleModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setShowScheduleModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-indigo-50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center">
+                  <CalendarPlus size={16} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Schedule Event</h3>
+                  <p className="text-xs text-gray-500">for {patient.full_name.split(" ")[0]}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  value={scheduleForm.title}
+                  onChange={e => setScheduleForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. Weekly therapy session"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-gray-300"
+                />
+              </div>
+
+              {/* Event Type */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Event Type
+                </label>
+                <select
+                  value={scheduleForm.event_type}
+                  onChange={e => setScheduleForm(f => ({ ...f, event_type: e.target.value as any }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="appointment">Appointment</option>
+                  <option value="homework_prompt">Homework</option>
+                  <option value="check_in">Check-in</option>
+                </select>
+              </div>
+
+              {/* Date & Time row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleForm.date}
+                    onChange={e => setScheduleForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={scheduleForm.time}
+                    onChange={e => setScheduleForm(f => ({ ...f, time: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Description <span className="normal-case font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={scheduleForm.description}
+                  onChange={e => setScheduleForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Add any notes for the parent..."
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-gray-300 leading-relaxed"
+                />
+              </div>
+
+              {/* Send notification toggle */}
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                <input
+                  type="checkbox"
+                  checked={scheduleForm.send_notification}
+                  onChange={e => setScheduleForm(f => ({ ...f, send_notification: e.target.checked }))}
+                  className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Send push notification to parent</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Parent will receive a notification on their phone</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6">
+              {scheduleSuccess ? (
+                <div className="w-full py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-2">
+                  <Check size={16} /> Event scheduled!
+                </div>
+              ) : (
+                <button
+                  onClick={createEvent}
+                  disabled={schedulingEvent || !scheduleForm.title.trim()}
+                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {schedulingEvent
+                    ? <><Loader2 size={15} className="animate-spin" /> Scheduling...</>
+                    : <><Send size={15} /> Schedule Event</>}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
