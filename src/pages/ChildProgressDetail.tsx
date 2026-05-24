@@ -1518,8 +1518,7 @@ export default function ChildProgressDetail() {
           anxious: selectedSketch.scores?.anxious ?? selectedSketch.anxious,
         };
         const hasBreakdown = Object.values(rawScores).some(v => v != null && v > 0);
-        const maxVal = Math.max(...Object.values(rawScores).map(v => v ?? 0));
-        const normalize = (v: number) => maxVal <= 1 ? Math.round(v * 100) : Math.round(v);
+        const maxVal = Math.max(...Object.values(rawScores).map(v => v ?? 0), 1);
         const fallbackPct = selectedSketch.score != null
           ? (selectedSketch.score <= 1 ? Math.round((selectedSketch.score as number) * 100) : Math.round(selectedSketch.score as number))
           : 100;
@@ -1609,12 +1608,12 @@ export default function ChildProgressDetail() {
 
                   {/* Session Result */}
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-3">Session Result</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-3">Signal Intensity</p>
                     {hasBreakdown ? (
                       <div className="space-y-3">
                         {Object.entries(EMOTIONS).map(([key, em]) => {
                           const raw = rawScores[key] ?? 0;
-                          const pct = normalize(raw as number);
+                          const barPct = Math.round(((raw as number) / maxVal) * 100);
                           const isDominant = key === selectedSketch.emotion;
                           return (
                             <div key={key}>
@@ -1632,13 +1631,13 @@ export default function ChildProgressDetail() {
                                   )}
                                 </span>
                                 <span className="text-sm font-bold" style={{ color: isDominant ? em.color : "#6b7280" }}>
-                                  {pct}%
+                                  {raw ?? 0} pts
                                 </span>
                               </div>
                               <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
                                   className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${pct}%`, backgroundColor: em.color, opacity: isDominant ? 1 : 0.55 }}
+                                  style={{ width: `${barPct}%`, backgroundColor: em.color, opacity: isDominant ? 1 : 0.55 }}
                                 />
                               </div>
                             </div>

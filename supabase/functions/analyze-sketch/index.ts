@@ -179,21 +179,19 @@ If figure has a smiling face BUT anxious/sad/angry body posture (hunched shoulde
 SCORING ALGORITHM
 ════════════════════════════════════════
 STEP 1 — For each emotion, sum the points of all matching signals using the tiers above.
-STEP 2 — Interaction bonus: if 3 or more signals from one emotion are mutually reinforcing, multiply that emotion's raw score by 1.25 before normalization.
+STEP 2 — Interaction bonus: if 3 or more signals from one emotion are mutually reinforcing, multiply that emotion's raw score by 1.25.
 STEP 3 — Assign a baseline of 5 points to any emotion with zero matching signals.
-STEP 4 — Normalize all four raw scores so they sum to exactly 100 (divide each by total, multiply by 100, round to integers, adjust largest to fix rounding error).
-STEP 5 — Apply mandatory correction rules:
-  • HAPPY requires at least 2 distinct positive signals. If happy has 0–1 signals, cap happy at 30 BEFORE normalization.
-  • Any single STRONG negative signal caps happy at 35 BEFORE normalization.
-  • No category may exceed 78 unless it has 4+ matching signals.
-  • If happy is capped and its normalized value exceeds the cap, reduce happy to the cap and distribute excess proportionally to the other three categories.
-  • If drawing is abstract, minimal, or has very few identifiable features, keep all four within 20 points of each other.
+STEP 4 — Apply mandatory correction rules:
+  • HAPPY requires at least 2 distinct positive signals. If happy has 0–1 signals, cap happy's raw total at 20.
+  • Any single STRONG negative signal caps happy's raw total at 25.
+  • No category may exceed 100 raw points unless it has 4+ matching signals.
+  • If drawing is abstract, minimal, or has very few identifiable features, no single category should be more than 3× any other.
   • Do NOT assign happy a high score by elimination. Happy must be earned by visible positive evidence.
 
 OUTPUT FORMAT — return exactly one of these two, nothing else:
 valid:true,happy:X,sad:X,angry:X,anxious:X
 valid:false
-Where X is an integer and the four values sum to exactly 100. No explanation, no extra text.`;
+Where X is a raw integer point total (values do NOT need to sum to 100). No explanation, no extra text.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOUSE DRAWING — House-Tree-Person (HTP)
@@ -377,21 +375,19 @@ HAPPY: gembira / seronok / bahagia / sayang / syukur / cantik / rumah kita / hap
 SCORING ALGORITHM
 ════════════════════════════════════════
 STEP 1 — Sum points for each emotion from ALL sections (Kinetic + Structure + Roof + Chimney + Doors/Windows + Walls + Environment + Tree + Text).
-STEP 2 — Interaction bonus: if 3 or more signals from one emotion are mutually reinforcing, multiply that emotion's raw score by 1.25 before normalization.
+STEP 2 — Interaction bonus: if 3 or more signals from one emotion are mutually reinforcing, multiply that emotion's raw score by 1.25.
 STEP 3 — Assign a baseline of 5 points to any emotion with zero matching signals.
-STEP 4 — Normalize all four raw scores so they sum to exactly 100 (divide each by total, multiply by 100, round to integers, adjust largest to fix rounding error).
-STEP 5 — Apply mandatory correction rules:
-  • HAPPY requires at least 2 distinct positive signals. If happy has 0–1 signals, cap happy at 30 BEFORE normalization.
-  • Any single STRONG negative signal caps happy at 35 BEFORE normalization.
-  • No category may exceed 78 unless it has 4+ matching signals.
-  • If happy is capped and its normalized value exceeds the cap, reduce happy to the cap and distribute excess proportionally to the other three categories.
-  • If drawing has very few identifiable features, keep all four within 20 points of each other.
+STEP 4 — Apply mandatory correction rules:
+  • HAPPY requires at least 2 distinct positive signals. If happy has 0–1 signals, cap happy's raw total at 20.
+  • Any single STRONG negative signal caps happy's raw total at 25.
+  • No category may exceed 100 raw points unless it has 4+ matching signals.
+  • If drawing has very few identifiable features, no single category should be more than 3× any other.
   • Do NOT assign happy a high score by elimination. Happy must be earned by visible positive evidence.
 
 OUTPUT FORMAT — return exactly one of these two, nothing else:
 valid:true,happy:X,sad:X,angry:X,anxious:X
 valid:false
-Where X is an integer and the four values sum to exactly 100. No explanation, no extra text.`;
+Where X is a raw integer point total (values do NOT need to sum to 100). No explanation, no extra text.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CALL 2 — HOUSE: clinical observations + therapist message
@@ -693,23 +689,18 @@ serve(async (req: Request) => {
       }
     }
 
-    const total = Object.values(scores).reduce((s, v) => s + v, 0);
-    if (total > 0 && total !== 100) {
-      for (const k of VALID_EMOTIONS) scores[k] = Math.round((scores[k] / total) * 100);
-    }
-
     const emotion: Emotion = parseOk
       ? (VALID_EMOTIONS.reduce((a, b) => scores[a] >= scores[b] ? a : b) as Emotion)
       : "happy";
 
     if (!parseOk || Object.values(scores).every(v => v === 0)) {
-      scores[emotion] = 70;
-      VALID_EMOTIONS.filter(e => e !== emotion).forEach(e => { scores[e] = 10; });
+      scores[emotion] = 50;
+      VALID_EMOTIONS.filter(e => e !== emotion).forEach(e => { scores[e] = 5; });
     }
 
     // ── Call 2: Therapist message + HTP clinical features ────────────────────
     const drawingType = promptType === "house" ? "house drawing" : "self-portrait";
-    const scoresSummary = VALID_EMOTIONS.map((e) => `${e}: ${scores[e]}%`).join(", ");
+    const scoresSummary = VALID_EMOTIONS.map((e) => `${e}: ${scores[e]} pts`).join(", ");
     const preMoodLine = preMood ? `\nThe child said they felt "${preMood}" before drawing.` : "";
     const contrastNote = preMood && preMood !== emotion
       ? `The child said they felt "${preMood}" before drawing but the drawing shows "${emotion}". Gently acknowledge this difference and reassure them it is normal.`
