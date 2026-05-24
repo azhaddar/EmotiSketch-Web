@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { Bell, MessageSquare, PenLine, AlertCircle, UserCheck, CalendarDays } from "lucide-react";
+import { Bell, MessageSquare, PenLine, AlertCircle, UserCheck, CalendarDays, Palette } from "lucide-react";
 
 interface NotifItem {
   id: string;
-  type: "message" | "drawing" | "profile" | "assigned" | "calendar_event";
+  type: "message" | "drawing" | "profile" | "assigned" | "calendar_event" | "drawing_schedule_response";
   title: string;
   desc: string;
   time: string;
@@ -14,11 +14,12 @@ interface NotifItem {
 }
 
 const TYPE_CONFIG = {
-  message:        { icon: MessageSquare, color: "text-[#e13d7d]", bg: "bg-pink-100"   },
-  drawing:        { icon: PenLine,       color: "text-purple-600", bg: "bg-purple-100" },
-  profile:        { icon: AlertCircle,   color: "text-amber-600",  bg: "bg-amber-100"  },
-  assigned:       { icon: UserCheck,     color: "text-green-600",  bg: "bg-green-100"  },
-  calendar_event: { icon: CalendarDays,  color: "text-blue-600",   bg: "bg-blue-100"   },
+  message:                    { icon: MessageSquare, color: "text-[#e13d7d]", bg: "bg-pink-100"   },
+  drawing:                    { icon: PenLine,       color: "text-purple-600", bg: "bg-purple-100" },
+  profile:                    { icon: AlertCircle,   color: "text-amber-600",  bg: "bg-amber-100"  },
+  assigned:                   { icon: UserCheck,     color: "text-green-600",  bg: "bg-green-100"  },
+  calendar_event:             { icon: CalendarDays,  color: "text-blue-600",   bg: "bg-blue-100"   },
+  drawing_schedule_response:  { icon: Palette,       color: "text-violet-600", bg: "bg-violet-100" },
 };
 
 function relativeTime(iso: string) {
@@ -61,6 +62,20 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
   useEffect(() => {
     if (open && myId && myRole) fetchNotifications();
   }, [open]);
+
+  // Real-time: re-fetch when a drawing_schedule event is responded to
+  useEffect(() => {
+    if (!myId || myRole !== "therapist") return;
+    const channel = supabase
+      .channel(`drawing-schedule-${myId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "child_events", filter: `therapist_id=eq.${myId}` },
+        () => fetchNotifications(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [myId, myRole]);
 
   async function fetchNotifications() {
     setLoading(true);
@@ -146,7 +161,46 @@ export default function NotificationPanel({ open, onClose, onCountChange }: Prop
         }
       }
 
-      // ── 3. Incomplete therapist profile ────────────────────────────────────
+      // ── 3. Drawing schedule responses from parents ─────────────────────────
+      const since30d = new Date(Date.now() - 30 * 24 * 3600000).toISOString();
+      const { data: scheduleResponses } = await supabase
+        .from("child_events")
+        .select("id, title, scheduled_at, parent_status, child_id")
+        .eq("therapist_id", myId)
+        .eq("event_type", "drawing_schedule")
+        .in("parent_status", ["accepted", "rejected"])
+        .gte("scheduled_at", since30d)
+        .order("scheduled_at", { ascending: false })
+        .limit(10);
+
+      if (scheduleResponses?.length) {
+        const childIds = [...new Set(scheduleResponses.map(r => r.child_id))];
+        const { data: childList } = await supabase
+          .from("patients").select("id, full_name").in("id", childIds);
+        const childMap: Record<string, string> = {};
+        (childList ?? []).forEach(c => { childMap[c.id] = c.full_name; });
+
+        for (const r of scheduleResponses) {
+          const childFirst = (childMap[r.child_id] ?? "A child").split(" ")[0];
+          const dateLabel  = new Date(r.scheduled_at).toLocaleDateString("en-MY", {
+            weekday: "short", day: "numeric", month: "short",
+          });
+          const accepted = r.parent_status === "accepted";
+          notifs.push({
+            id:    `schedule-response-${r.id}`,
+            type:  "drawing_schedule_response",
+            title: accepted
+              ? `${childFirst}'s parent accepted the drawing session`
+              : `${childFirst}'s parent rejected the drawing session`,
+            desc:  `${r.title} · ${dateLabel}`,
+            time:  r.scheduled_at,
+            isNew: !seenIds.has(`schedule-response-${r.id}`),
+            link:  `/dashboard/children/${r.child_id}`,
+          });
+        }
+      }
+
+      // ── 4. Incomplete therapist profile ────────────────────────────────────
       const { data: tp } = await supabase
         .from("therapist_profiles")
         .select("professional_title, license_number")

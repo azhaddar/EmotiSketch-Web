@@ -76,6 +76,7 @@ interface ChildEvent {
   description?: string | null;
   event_type: string;
   scheduled_at: string;
+  parent_status?: string;
 }
 
 const EMOTIONS: Record<string, { label: string; color: string; bg: string; text: string; ring: string }> = {
@@ -327,14 +328,16 @@ const MONTH_NAMES = [
   "July","August","September","October","November","December",
 ];
 const CAL_EVENT_COLORS: Record<string, string> = {
-  appointment: "#10B981",
-  homework_prompt: "#F59E0B",
-  check_in: "#3B82F6",
+  appointment:      "#10B981",
+  homework_prompt:  "#F59E0B",
+  check_in:         "#3B82F6",
+  drawing_schedule: "#7C3AED",
 };
 const CAL_EVENT_LABELS: Record<string, string> = {
-  appointment: "Appointment",
-  homework_prompt: "Homework",
-  check_in: "Check-in",
+  appointment:      "Appointment",
+  homework_prompt:  "Homework",
+  check_in:         "Check-in",
+  drawing_schedule: "Drawing Session",
 };
 
 function CalendarGridView({
@@ -475,25 +478,42 @@ function CalendarGridView({
             <p className="text-sm text-gray-400 text-center py-3">Nothing recorded on this day</p>
           ) : (
             <div className="space-y-2">
-              {dayEventList.map(ev => (
-                <div key={ev.id} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: (CAL_EVENT_COLORS[ev.event_type] ?? "#10B981") + "22" }}
-                  >
-                    <Calendar size={14} style={{ color: CAL_EVENT_COLORS[ev.event_type] ?? "#10B981" }} />
+              {dayEventList.map(ev => {
+                const evColor = CAL_EVENT_COLORS[ev.event_type] ?? "#10B981";
+                const statusBadge = ev.event_type === "drawing_schedule" && ev.parent_status
+                  ? {
+                      accepted: { label: "Accepted", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                      rejected: { label: "Rejected", cls: "bg-red-50 text-red-700 border-red-200" },
+                      pending:  { label: "Pending",  cls: "bg-amber-50 text-amber-700 border-amber-200" },
+                    }[ev.parent_status]
+                  : null;
+                return (
+                  <div key={ev.id} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: evColor + "22" }}
+                    >
+                      <Calendar size={14} style={{ color: evColor }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800">{ev.title}</p>
+                        {statusBadge && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
+                            {statusBadge.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {CAL_EVENT_LABELS[ev.event_type] ?? ev.event_type}
+                        {" · "}
+                        {new Date(ev.scheduled_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{ev.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {CAL_EVENT_LABELS[ev.event_type] ?? ev.event_type}
-                      {" · "}
-                      {new Date(ev.scheduled_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                    {ev.description && <p className="text-xs text-gray-400 mt-1">{ev.description}</p>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {daySketchList.map(sk => {
                 const e = EMOTIONS[sk.emotion];
                 return (
@@ -570,7 +590,7 @@ export default function ChildProgressDetail() {
   const [schedulingEvent, setSchedulingEvent]     = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     title: '',
-    event_type: 'appointment' as 'appointment' | 'homework_prompt' | 'check_in',
+    event_type: 'appointment' as 'appointment' | 'homework_prompt' | 'check_in' | 'drawing_schedule',
     date: new Date().toISOString().split('T')[0],
     time: '10:00',
     description: '',
@@ -628,7 +648,7 @@ export default function ChildProgressDetail() {
 
       const { data: eventsData } = await supabase
         .from("child_events")
-        .select("id, child_id, title, description, event_type, scheduled_at")
+        .select("id, child_id, title, description, event_type, scheduled_at, parent_status")
         .eq("child_id", patientId)
         .order("scheduled_at", { ascending: true });
       setChildEvents(eventsData || []);
@@ -764,17 +784,22 @@ export default function ChildProgressDetail() {
       if (!user) throw new Error("Not authenticated");
 
       const scheduled_at = new Date(`${scheduleForm.date}T${scheduleForm.time}`).toISOString();
-      const { error } = await supabase.from("child_events").insert({
+      const { data: newEvent, error } = await supabase.from("child_events").insert({
         child_id:     patient.id,
         therapist_id: user.id,
         title:        scheduleForm.title.trim(),
         description:  scheduleForm.description.trim() || null,
         event_type:   scheduleForm.event_type,
         scheduled_at,
-      });
+      }).select("id").single();
       if (error) throw error;
 
-      if (scheduleForm.send_notification) {
+      if (scheduleForm.event_type === "drawing_schedule") {
+        // Edge function handles push notification + marks is_notified
+        await supabase.functions.invoke("send-push-notification", {
+          body: { eventId: newEvent.id },
+        });
+      } else if (scheduleForm.send_notification) {
         const { data: guardianProfile } = await supabase
           .from("profiles")
           .select("expo_push_token")
@@ -1853,6 +1878,7 @@ export default function ChildProgressDetail() {
                   <option value="appointment">Appointment</option>
                   <option value="homework_prompt">Homework</option>
                   <option value="check_in">Check-in</option>
+                  <option value="drawing_schedule">Drawing Session</option>
                 </select>
               </div>
 
@@ -1896,19 +1922,31 @@ export default function ChildProgressDetail() {
                 />
               </div>
 
-              {/* Send notification toggle */}
-              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-                <input
-                  type="checkbox"
-                  checked={scheduleForm.send_notification}
-                  onChange={e => setScheduleForm(f => ({ ...f, send_notification: e.target.checked }))}
-                  className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Send push notification to parent</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Parent will receive a notification on their phone</p>
+              {/* Send notification toggle — always on for drawing sessions */}
+              {scheduleForm.event_type === "drawing_schedule" ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-violet-50 border border-violet-100">
+                  <div className="w-4 h-4 rounded bg-violet-600 flex items-center justify-center flex-shrink-0">
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Push notification sent to parent</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Parent will accept or reject the drawing session</p>
+                  </div>
                 </div>
-              </label>
+              ) : (
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                  <input
+                    type="checkbox"
+                    checked={scheduleForm.send_notification}
+                    onChange={e => setScheduleForm(f => ({ ...f, send_notification: e.target.checked }))}
+                    className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Send push notification to parent</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Parent will receive a notification on their phone</p>
+                  </div>
+                </label>
+              )}
             </div>
 
             {/* Footer */}

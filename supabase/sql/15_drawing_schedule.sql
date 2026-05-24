@@ -17,7 +17,8 @@ ALTER TABLE public.child_events
 
 -- 3. Allow guardians to update parent_status on drawing_schedule events for their children
 --    (they can only flip the status field, not modify any other column — enforced by WITH CHECK)
-CREATE POLICY IF NOT EXISTS "guardian_respond_drawing_schedule" ON public.child_events
+DROP POLICY IF EXISTS "guardian_respond_drawing_schedule" ON public.child_events;
+CREATE POLICY "guardian_respond_drawing_schedule" ON public.child_events
   FOR UPDATE TO authenticated
   USING (
     event_type = 'drawing_schedule'
