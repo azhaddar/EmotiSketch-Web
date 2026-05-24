@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
+import { logActivity } from "../lib/activityLog";
 
 export default function AddPatient() {
   const navigate = useNavigate();
@@ -98,9 +99,26 @@ export default function AddPatient() {
         payload.therapist_id = null;
       }
 
+      // Guard: ensure the parent's profile row exists (trigger may have failed at registration)
+      if (currentUserRole === "user") {
+        await supabase.from("profiles").upsert({
+          id:        user.id,
+          full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Parent",
+          email:     user.email ?? "",
+          role:      "user",
+        }, { onConflict: "id" });
+      }
+
       const { error } = await supabase.from("patients").insert([payload]);
 
       if (error) throw error;
+
+      await logActivity({
+        action: 'patient.created',
+        entity_type: 'patient',
+        entity_label: formData.full_name,
+        meta: { age: formData.age, gender: formData.gender },
+      });
 
       alert("Child profile added successfully!");
 

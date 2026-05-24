@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   User, NotebookPen, ArrowRight, Loader2, Plus,
-  Search, SlidersHorizontal, ArrowUpDown, X, Check,
+  Search, SlidersHorizontal, X, Check, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -15,47 +15,47 @@ interface Child {
   status: string;
   therapist_id?: string | null;
   therapist?: { id: string; full_name: string } | null;
+  guardian?: { full_name: string } | null;
 }
 
-type SortKey = "name_asc" | "name_desc" | "age_asc" | "age_desc" | "sketches_desc" | "sketches_asc";
+type SortCol = "name" | "age" | "sketches" | "status";
+type SortDir = "asc" | "desc";
 type StatusFilter = "all" | "active" | "inactive" | "complete" | "unassigned";
 type GenderFilter = "all" | "Male" | "Female";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "name_asc",      label: "Name (A → Z)" },
-  { value: "name_desc",     label: "Name (Z → A)" },
-  { value: "age_asc",       label: "Age (Youngest)" },
-  { value: "age_desc",      label: "Age (Oldest)" },
-  { value: "sketches_desc", label: "Most Sketches" },
-  { value: "sketches_asc",  label: "Fewest Sketches" },
-];
-
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: "all",        label: "All" },
-  { value: "active",     label: "Active" },
-  { value: "inactive",   label: "Inactive" },
-  { value: "complete",   label: "Complete" },
+  { value: "all",        label: "All"        },
+  { value: "active",     label: "Active"     },
+  { value: "inactive",   label: "Inactive"   },
+  { value: "complete",   label: "Complete"   },
   { value: "unassigned", label: "Unassigned" },
 ];
 
+const STATUS_STYLE: Record<string, string> = {
+  Unassigned: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+  Active:     "bg-green-50  text-green-700  border border-green-200",
+  Inactive:   "bg-gray-100  text-gray-600   border border-gray-200",
+  Complete:   "bg-teal-50   text-teal-700   border border-teal-200",
+};
+
 export default function ChildrenProgress() {
   const navigate = useNavigate();
-  const [children, setChildren] = useState<Child[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState("");
-  const [userId, setUserId] = useState<string>("");
-  const [therapists, setTherapists] = useState<{ id: string; full_name: string }[]>([]);
-  const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [children, setChildren]           = useState<Child[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [userRole, setUserRole]           = useState("");
+  const [userId, setUserId]               = useState("");
+  const [therapists, setTherapists]       = useState<{ id: string; full_name: string }[]>([]);
+  const [assigningId, setAssigningId]     = useState<string | null>(null);
+  const [savedId, setSavedId]             = useState<string | null>(null);
+  const [updatingId, setUpdatingId]       = useState<string | null>(null);
   const [statusSavedId, setStatusSavedId] = useState<string | null>(null);
 
-  // Controls
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("name_asc");
-  const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch]               = useState("");
+  const [statusFilter, setStatusFilter]   = useState<StatusFilter>("all");
+  const [genderFilter, setGenderFilter]   = useState<GenderFilter>("all");
+  const [showFilters, setShowFilters]     = useState(false);
+  const [sortCol, setSortCol]             = useState<SortCol>("name");
+  const [sortDir, setSortDir]             = useState<SortDir>("asc");
 
   useEffect(() => { fetchChildren(); }, []);
 
@@ -68,23 +68,20 @@ export default function ChildrenProgress() {
 
       const { data: profile } = await supabase
         .from("profiles").select("role").eq("id", user.id).single();
-
       const role = profile?.role?.toLowerCase() || "user";
       setUserRole(role);
 
       if (role === "admin") {
-        const { data: therapistData } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .eq("role", "therapist")
-          .order("full_name");
-        setTherapists(therapistData || []);
+        const { data: tData } = await supabase
+          .from("profiles").select("id, full_name").eq("role", "therapist").order("full_name");
+        setTherapists(tData || []);
       }
 
-      let query = supabase.from("patients").select("*, therapist:profiles!therapist_id(id, full_name)");
+      let query = supabase
+        .from("patients")
+        .select("*, therapist:profiles!therapist_id(id, full_name), guardian:profiles!guardian_id(full_name)");
 
       if (role === "therapist") {
-        // Show own patients + unassigned patients available to claim
         query = query.or(`therapist_id.eq.${user.id},therapist_id.is.null`);
       } else if (role === "user") {
         query = query.eq("guardian_id", user.id);
@@ -93,157 +90,124 @@ export default function ChildrenProgress() {
       const { data, error } = await query;
       if (error) throw error;
       setChildren(data || []);
-    } catch (error) {
-      console.error("Error fetching children:", error);
+    } catch (err) {
+      console.error("Error fetching children:", err);
     } finally {
       setLoading(false);
     }
   }
 
   async function claimPatient(childId: string, childName: string) {
-    const confirmed = window.confirm(
-      `Claim ${childName} as your patient?\n\nThis will assign you as their therapist and set their status to Active.`
-    );
-    if (!confirmed) return;
+    if (!window.confirm(`Claim ${childName} as your patient?\n\nThis will assign you as their therapist and set their status to Active.`)) return;
     setAssigningId(childId);
     try {
-      const { error } = await supabase
-        .from("patients")
-        .update({ therapist_id: userId, status: "Active" })
-        .eq("id", childId);
+      const { error } = await supabase.from("patients").update({ therapist_id: userId, status: "Active" }).eq("id", childId);
       if (error) throw error;
-      setChildren(prev => prev.map(c => c.id === childId
-        ? { ...c, therapist_id: userId, status: "Active" }
-        : c));
-      setSavedId(childId);
-      setTimeout(() => setSavedId(null), 2500);
-    } catch (err) {
-      console.error("Failed to claim patient:", err);
-      alert("Failed to claim patient. Please try again.");
-    } finally {
-      setAssigningId(null);
-    }
+      setChildren(prev => prev.map(c => c.id === childId ? { ...c, therapist_id: userId, status: "Active" } : c));
+      setSavedId(childId); setTimeout(() => setSavedId(null), 2500);
+    } catch { alert("Failed to claim patient. Please try again."); }
+    finally { setAssigningId(null); }
   }
 
   async function assignTherapist(childId: string, therapistId: string | null) {
     setAssigningId(childId);
     try {
-      const { error } = await supabase
-        .from("patients")
-        .update({ therapist_id: therapistId })
-        .eq("id", childId);
+      const { error } = await supabase.from("patients").update({ therapist_id: therapistId }).eq("id", childId);
       if (error) throw error;
       const matched = therapistId ? therapists.find(t => t.id === therapistId) : null;
       setChildren(prev => prev.map(c => c.id === childId ? {
-        ...c,
-        therapist_id: therapistId,
+        ...c, therapist_id: therapistId,
         therapist: matched ? { id: matched.id, full_name: matched.full_name } : null,
       } : c));
-      setSavedId(childId);
-      setTimeout(() => setSavedId(null), 2500);
-    } catch (err) {
-      console.error("Failed to assign therapist:", err);
-      alert("Failed to assign therapist. Please try again.");
-    } finally {
-      setAssigningId(null);
-    }
+      setSavedId(childId); setTimeout(() => setSavedId(null), 2500);
+    } catch { alert("Failed to assign therapist."); }
+    finally { setAssigningId(null); }
   }
 
   async function updateChildStatus(childId: string, newStatus: string) {
-    setUpdatingStatusId(childId);
+    setUpdatingId(childId);
     try {
-      const { error } = await supabase
-        .from("patients")
-        .update({ status: newStatus })
-        .eq("id", childId);
+      const { error } = await supabase.from("patients").update({ status: newStatus }).eq("id", childId);
       if (error) throw error;
       setChildren(prev => prev.map(c => c.id === childId ? { ...c, status: newStatus } : c));
-      setStatusSavedId(childId);
-      setTimeout(() => setStatusSavedId(null), 2500);
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      alert("Failed to update status. Please try again.");
-    } finally {
-      setUpdatingStatusId(null);
-    }
+      setStatusSavedId(childId); setTimeout(() => setStatusSavedId(null), 2500);
+    } catch { alert("Failed to update status."); }
+    finally { setUpdatingId(null); }
   }
 
-  const getDisplayStatus = (child: Child) =>
-    !child.therapist_id ? "Unassigned" : child.status;
+  const getDisplayStatus = (c: Child) => !c.therapist_id ? "Unassigned" : c.status;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Unassigned": return "bg-yellow-100 text-yellow-700 border border-yellow-200";
-      case "Active":     return "bg-green-100 text-green-700 border border-green-200";
-      case "Inactive":   return "bg-gray-100 text-gray-600 border border-gray-200";
-      case "Complete":   return "bg-teal-100 text-teal-700 border border-teal-200";
-      default:           return "bg-gray-100 text-gray-600";
-    }
-  };
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
 
-  // ── Derived list: filter + sort ──────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = [...children];
-
-    // Search
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      list = list.filter(c => c.full_name.toLowerCase().includes(q));
+      list = list.filter(c =>
+        c.full_name.toLowerCase().includes(q) ||
+        c.therapist?.full_name?.toLowerCase().includes(q) ||
+        c.guardian?.full_name?.toLowerCase().includes(q)
+      );
     }
-
-    // Status
-    if (statusFilter !== "all") {
-      list = list.filter(c => {
-        const s = getDisplayStatus(c).toLowerCase();
-        return s === statusFilter;
-      });
-    }
-
-    // Gender
-    if (genderFilter !== "all") {
-      list = list.filter(c => c.gender === genderFilter);
-    }
-
-    // Sort
+    if (statusFilter !== "all") list = list.filter(c => getDisplayStatus(c).toLowerCase() === statusFilter);
+    if (genderFilter !== "all") list = list.filter(c => c.gender === genderFilter);
     list.sort((a, b) => {
-      switch (sortKey) {
-        case "name_asc":      return a.full_name.localeCompare(b.full_name);
-        case "name_desc":     return b.full_name.localeCompare(a.full_name);
-        case "age_asc":       return a.age - b.age;
-        case "age_desc":      return b.age - a.age;
-        case "sketches_desc": return (b.total_sketches || 0) - (a.total_sketches || 0);
-        case "sketches_asc":  return (a.total_sketches || 0) - (b.total_sketches || 0);
-        default:              return 0;
-      }
+      let cmp = 0;
+      if (sortCol === "name")    cmp = a.full_name.localeCompare(b.full_name);
+      if (sortCol === "age")     cmp = a.age - b.age;
+      if (sortCol === "sketches") cmp = (a.total_sketches || 0) - (b.total_sketches || 0);
+      if (sortCol === "status")  cmp = getDisplayStatus(a).localeCompare(getDisplayStatus(b));
+      return sortDir === "asc" ? cmp : -cmp;
     });
-
     return list;
-  }, [children, search, statusFilter, genderFilter, sortKey]);
+  }, [children, search, statusFilter, genderFilter, sortCol, sortDir]);
 
-  const hasActiveFilters = search || statusFilter !== "all" || genderFilter !== "all" || sortKey !== "name_asc";
+  const hasActiveFilters = search || statusFilter !== "all" || genderFilter !== "all";
 
-  function clearAll() {
-    setSearch("");
-    setStatusFilter("all");
-    setGenderFilter("all");
-    setSortKey("name_asc");
+  function SortIcon({ col }: { col: SortCol }) {
+    if (sortCol !== col) return <ChevronUp size={12} className="text-gray-300" />;
+    return sortDir === "asc"
+      ? <ChevronUp size={12} className="text-pink-500" />
+      : <ChevronDown size={12} className="text-pink-500" />;
+  }
+
+  function ThCol({ col, label, className = "" }: { col: SortCol; label: string; className?: string }) {
+    return (
+      <th
+        onClick={() => toggleSort(col)}
+        className={`px-4 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-800 transition-colors ${className}`}
+      >
+        <span className="flex items-center gap-1">{label}<SortIcon col={col} /></span>
+      </th>
+    );
   }
 
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-1">
-          {userRole === "admin" ? "All Children Progress" : "Children's Journey"}
-        </h1>
-        <p className="text-gray-500 text-sm">
-          Track emotional growth and sketch activity over time.
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {userRole === "admin" ? "All Children Progress" : "Children's Journey"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">Track emotional growth and sketch activity over time.</p>
+        </div>
+        {userRole === "user" && (
+          <button
+            onClick={() => navigate("/dashboard/patients/add")}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#e13d7d] text-white text-sm font-semibold rounded-xl hover:bg-pink-600 transition-colors"
+          >
+            <Plus size={15} /> Add Child
+          </button>
+        )}
       </div>
 
+      {/* Search + filters */}
       {!loading && children.length > 0 && (
-        <div className="mb-6 space-y-3">
-          {/* Search + toggle row */}
+        <div className="mb-4 space-y-3">
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -251,25 +215,19 @@ export default function ChildrenProgress() {
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search by name…"
-                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400 transition bg-white"
+                placeholder="Search by name, therapist or parent…"
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white"
               />
               {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X size={14} />
                 </button>
               )}
             </div>
-
             <button
               onClick={() => setShowFilters(p => !p)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition ${
-                showFilters
-                  ? "bg-pink-50 border-pink-300 text-pink-600"
-                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                showFilters ? "bg-pink-50 border-pink-300 text-pink-600" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
               <SlidersHorizontal size={15} />
@@ -280,79 +238,42 @@ export default function ChildrenProgress() {
                 </span>
               )}
             </button>
-
-            {/* Sort dropdown */}
-            <div className="relative">
-              <div className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition">
-                <ArrowUpDown size={15} />
-                <select
-                  value={sortKey}
-                  onChange={e => setSortKey(e.target.value as SortKey)}
-                  className="bg-transparent focus:outline-none cursor-pointer text-sm font-semibold text-gray-600 pr-1"
-                >
-                  {SORT_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
 
-          {/* Expanded filter panel */}
           {showFilters && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-4">
-              {/* Status */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3">
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Status</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Status</p>
                 <div className="flex flex-wrap gap-2">
                   {STATUS_FILTERS.map(f => (
-                    <button
-                      key={f.value}
-                      onClick={() => setStatusFilter(f.value)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition ${
-                        statusFilter === f.value
-                          ? "bg-pink-500 text-white border-pink-500"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600"
+                    <button key={f.value} onClick={() => setStatusFilter(f.value)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                        statusFilter === f.value ? "bg-pink-500 text-white border-pink-500" : "bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600"
                       }`}
-                    >
-                      {f.label}
-                    </button>
+                    >{f.label}</button>
                   ))}
                 </div>
               </div>
-
-              {/* Gender */}
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Gender</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</p>
                 <div className="flex flex-wrap gap-2">
                   {(["all", "Male", "Female"] as GenderFilter[]).map(g => (
-                    <button
-                      key={g}
-                      onClick={() => setGenderFilter(g)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition ${
-                        genderFilter === g
-                          ? "bg-pink-500 text-white border-pink-500"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600"
+                    <button key={g} onClick={() => setGenderFilter(g)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                        genderFilter === g ? "bg-pink-500 text-white border-pink-500" : "bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600"
                       }`}
-                    >
-                      {g === "all" ? "All" : g}
-                    </button>
+                    >{g === "all" ? "All" : g}</button>
                   ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Result count + clear */}
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>
-              Showing <span className="font-semibold text-gray-700">{filtered.length}</span> of {children.length} children
-            </span>
+            <span>Showing <span className="font-semibold text-gray-700">{filtered.length}</span> of {children.length} children</span>
             {hasActiveFilters && (
-              <button
-                onClick={clearAll}
-                className="flex items-center gap-1 text-pink-500 hover:text-pink-700 font-semibold transition"
-              >
+              <button onClick={() => { setSearch(""); setStatusFilter("all"); setGenderFilter("all"); }}
+                className="flex items-center gap-1 text-pink-500 hover:text-pink-700 font-semibold">
                 <X size={12} /> Clear all
               </button>
             )}
@@ -360,167 +281,192 @@ export default function ChildrenProgress() {
         </div>
       )}
 
-      {/* Content */}
+      {/* States */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-pink-600" size={40} />
+        <div className="flex justify-center py-24">
+          <Loader2 className="animate-spin text-pink-500" size={36} />
         </div>
       ) : children.length === 0 ? (
-        <div className="bg-white p-10 rounded-xl shadow-sm text-center border border-gray-200">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-14 text-center">
           <div className="inline-flex p-4 bg-gray-50 rounded-full mb-4">
-            <User size={32} className="text-gray-400" />
+            <User size={32} className="text-gray-300" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900">No profiles found</h3>
-          <p className="text-gray-500 mt-1 mb-6 max-w-md mx-auto">
-            {userRole === "therapist"
-              ? "You have no active patients assigned."
-              : userRole === "admin"
-              ? "No children registered in the system."
-              : "You haven't been assigned to any children yet."}
+          <h3 className="text-base font-semibold text-gray-800">No children found</h3>
+          <p className="text-sm text-gray-400 mt-1 mb-6">
+            {userRole === "therapist" ? "No patients assigned to you yet."
+              : userRole === "admin" ? "No children registered in the system."
+              : "You haven't added any children yet."}
           </p>
           {userRole === "user" && (
-            <button
-              onClick={() => navigate("/dashboard/patients/add")}
-              className="inline-flex items-center gap-2 bg-[#e13d7d] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#c42f6a] transition-all shadow-sm active:scale-95"
-            >
-              <Plus size={20} />
-              Add Your First Child
+            <button onClick={() => navigate("/dashboard/patients/add")}
+              className="inline-flex items-center gap-2 bg-[#e13d7d] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-pink-600 transition-colors">
+              <Plus size={16} /> Add Your First Child
             </button>
           )}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white p-10 rounded-xl shadow-sm text-center border border-gray-200">
-          <div className="inline-flex p-4 bg-gray-50 rounded-full mb-4">
-            <Search size={28} className="text-gray-400" />
-          </div>
-          <h3 className="text-base font-semibold text-gray-800">No children match your filters</h3>
-          <p className="text-gray-400 text-sm mt-1 mb-4">Try adjusting the search or filter criteria.</p>
-          <button
-            onClick={clearAll}
-            className="text-sm text-pink-500 hover:text-pink-700 font-semibold transition"
-          >
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-14 text-center">
+          <Search size={28} className="mx-auto text-gray-300 mb-3" />
+          <h3 className="text-base font-semibold text-gray-700">No results match your filters</h3>
+          <button onClick={() => { setSearch(""); setStatusFilter("all"); setGenderFilter("all"); }}
+            className="mt-3 text-sm text-pink-500 font-semibold hover:text-pink-700">
             Clear all filters
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((child) => {
-            const displayStatus = getDisplayStatus(child);
-            const isUnassigned = !child.therapist_id;
-            const isOwnPatient = child.therapist_id === userId;
-
-            return (
-              <div
-                key={child.id}
-                onClick={() => !isUnassigned && navigate(`/dashboard/children/${child.id}`)}
-                className={`bg-white rounded-xl shadow-sm border p-6 transition-shadow group ${
-                  isUnassigned && userRole === "therapist"
-                    ? "border-dashed border-gray-300 cursor-default"
-                    : "border-gray-200 hover:shadow-md cursor-pointer"
-                }`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white ${
-                      child.gender === "Female" ? "bg-pink-400" : "bg-blue-400"
-                    }`}>
-                      {child.full_name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{child.full_name}</h3>
-                      <p className="text-sm text-gray-500">{child.age} years old · {child.gender}</p>
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded-full ${getStatusColor(displayStatus)}`}>
-                    {displayStatus}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-gray-600">
-                    <NotebookPen size={16} /> Total Sketches
-                  </span>
-                  <span className="font-semibold text-gray-900">{child.total_sketches || 0}</span>
-                </div>
-
-                {/* Admin: therapist assignment dropdown */}
-                {userRole === "admin" && (
-                  <div className="mt-4 pt-4 border-t border-gray-100" onClick={e => e.stopPropagation()}>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Assigned Therapist</p>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={child.therapist_id || ""}
-                        onChange={e => assignTherapist(child.id, e.target.value || null)}
-                        disabled={assigningId === child.id}
-                        className="flex-1 text-sm text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white disabled:opacity-50 cursor-pointer"
-                      >
-                        <option value="">— Unassigned —</option>
-                        {therapists.map(t => (
-                          <option key={t.id} value={t.id}>{t.full_name}</option>
-                        ))}
-                      </select>
-                      {assigningId === child.id && <Loader2 size={14} className="animate-spin text-pink-500 flex-shrink-0" />}
-                      {savedId === child.id && <Check size={14} className="text-green-500 flex-shrink-0" />}
-                    </div>
-                  </div>
+        /* ── Table ── */
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <ThCol col="name"    label="Child" className="pl-5" />
+                <ThCol col="age"     label="Age"   />
+                <ThCol col="status"  label="Status" />
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  {userRole === "user" ? "Therapist" : "Parent"}
+                </th>
+                {userRole !== "user" && (
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    {userRole === "admin" ? "Assigned Therapist" : "Therapist"}
+                  </th>
                 )}
+                <ThCol col="sketches" label="Sketches" />
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map(child => {
+                const displayStatus = getDisplayStatus(child);
+                const isUnassigned  = !child.therapist_id;
+                const isOwnPatient  = child.therapist_id === userId;
 
-                {/* Therapist: claim button for unassigned, or view report for own */}
-                {userRole === "therapist" && isUnassigned ? (
-                  <div className="mt-4 pt-4 border-t border-gray-100" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => claimPatient(child.id, child.full_name)}
-                      disabled={assigningId === child.id}
-                      className="w-full py-2 rounded-xl text-sm font-semibold bg-[#e13d7d] text-white hover:bg-pink-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {assigningId === child.id
-                        ? <><Loader2 size={14} className="animate-spin" /> Claiming...</>
-                        : savedId === child.id
-                        ? <><Check size={14} /> Claimed!</>
-                        : "Claim Patient"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                    {/* Status dropdown — therapist's own patients only */}
-                    {userRole === "therapist" && isOwnPatient && (
-                      <div onClick={e => e.stopPropagation()}>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Status</p>
-                        <div className="flex items-center gap-2">
+                return (
+                  <tr
+                    key={child.id}
+                    onClick={() => !isUnassigned && navigate(`/dashboard/children/${child.id}`)}
+                    className={`group transition-colors ${
+                      isUnassigned && userRole === "therapist"
+                        ? "cursor-default bg-white"
+                        : "cursor-pointer hover:bg-pink-50/40"
+                    }`}
+                  >
+                    {/* Child */}
+                    <td className="pl-5 pr-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${
+                          child.gender === "Female" ? "bg-pink-400" : "bg-blue-400"
+                        }`}>
+                          {child.full_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 leading-tight">{child.full_name}</p>
+                          <p className="text-xs text-gray-400">{child.gender}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Age */}
+                    <td className="px-4 py-3.5">
+                      <span className="text-sm text-gray-700">{child.age} yrs</span>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      {userRole === "therapist" && isOwnPatient ? (
+                        <div className="flex items-center gap-1.5">
                           <select
                             value={child.status}
                             onChange={e => updateChildStatus(child.id, e.target.value)}
-                            disabled={updatingStatusId === child.id}
-                            className={`flex-1 text-xs font-semibold border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer disabled:opacity-50 ${
-                              child.status === "Active"
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : child.status === "Complete"
-                                ? "bg-teal-50 text-teal-700 border-teal-200"
-                                : "bg-gray-50 text-gray-500 border-gray-200"
+                            disabled={updatingId === child.id}
+                            className={`text-xs font-semibold border rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer disabled:opacity-50 ${
+                              child.status === "Active"   ? "bg-green-50 text-green-700 border-green-200"
+                              : child.status === "Complete" ? "bg-teal-50 text-teal-700 border-teal-200"
+                              : "bg-gray-50 text-gray-500 border-gray-200"
                             }`}
                           >
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
                             <option value="Complete">Complete</option>
                           </select>
-                          {updatingStatusId === child.id && <Loader2 size={14} className="animate-spin text-pink-500 flex-shrink-0" />}
-                          {statusSavedId === child.id && <Check size={14} className="text-green-500 flex-shrink-0" />}
+                          {updatingId === child.id   && <Loader2 size={12} className="animate-spin text-pink-400" />}
+                          {statusSavedId === child.id && <Check size={12} className="text-green-500" />}
                         </div>
-                      </div>
+                      ) : (
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${STATUS_STYLE[displayStatus] ?? "bg-gray-100 text-gray-500"}`}>
+                          {displayStatus}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Parent or Therapist (simple display column) */}
+                    <td className="px-4 py-3.5">
+                      <span className="text-sm text-gray-600">
+                        {userRole === "user"
+                          ? (child.therapist?.full_name ?? <span className="text-gray-300 italic">Unassigned</span>)
+                          : (child.guardian?.full_name  ?? <span className="text-gray-300 italic">—</span>)
+                        }
+                      </span>
+                    </td>
+
+                    {/* Assigned Therapist column — admin dropdown / therapist label */}
+                    {userRole !== "user" && (
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        {userRole === "admin" ? (
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={child.therapist_id || ""}
+                              onChange={e => assignTherapist(child.id, e.target.value || null)}
+                              disabled={assigningId === child.id}
+                              className="text-sm text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white disabled:opacity-50 cursor-pointer max-w-[160px]"
+                            >
+                              <option value="">— Unassigned —</option>
+                              {therapists.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                            </select>
+                            {assigningId === child.id && <Loader2 size={12} className="animate-spin text-pink-400" />}
+                            {savedId     === child.id && <Check    size={12} className="text-green-500" />}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-600">
+                            {child.therapist?.full_name ?? <span className="text-gray-300 italic">Unassigned</span>}
+                          </span>
+                        )}
+                      </td>
                     )}
-                    <div className={`flex items-center justify-between text-sm font-medium ${
-                      isOwnPatient || userRole !== "therapist"
-                        ? "text-pink-600 group-hover:text-pink-700"
-                        : "text-gray-400"
-                    }`}>
-                      View Detailed Report
-                      <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+
+                    {/* Sketches */}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <NotebookPen size={13} className="text-gray-400" />
+                        {child.total_sketches || 0}
+                      </div>
+                    </td>
+
+                    {/* Action */}
+                    <td className="pl-2 pr-5 py-3.5" onClick={e => e.stopPropagation()}>
+                      {userRole === "therapist" && isUnassigned ? (
+                        <button
+                          onClick={() => claimPatient(child.id, child.full_name)}
+                          disabled={assigningId === child.id}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#e13d7d] text-white hover:bg-pink-600 disabled:opacity-50 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                          {assigningId === child.id ? <><Loader2 size={11} className="animate-spin" /> Claiming…</>
+                           : savedId === child.id   ? <><Check size={11} /> Claimed!</>
+                           : "Claim Patient"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/dashboard/children/${child.id}`)}
+                          className="flex items-center gap-1 text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors group-hover:underline whitespace-nowrap"
+                        >
+                          View Report <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

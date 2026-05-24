@@ -26,6 +26,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { EmotionIcon } from "../components/EmotionIcon";
+import { logActivity } from "../lib/activityLog";
 
 interface Patient {
   id: string;
@@ -616,7 +617,7 @@ export default function ChildProgressDetail() {
       if (user) {
         const { data: prof } = await supabase
           .from("profiles").select("role").eq("id", user.id).single();
-        resolvedRole = (prof?.role ?? "").toLowerCase();
+        resolvedRole = (prof?.role ?? user.user_metadata?.role ?? "").toLowerCase();
         setRole(resolvedRole);
       }
 
@@ -675,6 +676,14 @@ export default function ChildProgressDetail() {
       const { error } = await supabase.from("sketches").delete().eq("id", sketch.id);
       if (error) throw error;
 
+      await logActivity({
+        action: 'sketch.deleted',
+        entity_type: 'sketch',
+        entity_id: sketch.id,
+        entity_label: `${sketch.emotion} sketch — ${patient?.full_name ?? ''}`,
+        meta: { patient_id: sketch.patient_id, emotion: sketch.emotion },
+      });
+
       setSketches(prev => prev.filter(s => s.id !== sketch.id));
       setPatient(prev => prev ? { ...prev, total_sketches: Math.max(0, (prev.total_sketches ?? 1) - 1) } : prev);
     } catch (err) {
@@ -720,6 +729,13 @@ export default function ChildProgressDetail() {
         therapist_id: therapistId,
         therapist: matched ? { full_name: matched.full_name } : undefined,
       } : prev);
+      await logActivity({
+        action: 'patient.therapist_assigned',
+        entity_type: 'patient',
+        entity_id: patient.id,
+        entity_label: patient.full_name,
+        meta: { therapist_id: therapistId, therapist_name: matched?.full_name ?? 'Unassigned' },
+      });
       setTherapistSaved(true);
       setTimeout(() => setTherapistSaved(false), 3000);
     } catch (err) {
@@ -746,6 +762,13 @@ export default function ChildProgressDetail() {
       const patch = { status: newStatus, ...extra };
       setSketches(prev => prev.map(s => s.id === selectedSketch.id ? { ...s, ...patch } : s));
       setSelectedSketch(prev => prev ? { ...prev, ...patch } : prev);
+      await logActivity({
+        action: newStatus === 'reviewing' ? 'sketch.reviewed' : 'sketch.verified',
+        entity_type: 'sketch',
+        entity_id: selectedSketch.id,
+        entity_label: `${selectedSketch.emotion} sketch — ${patient?.full_name ?? ''}`,
+        meta: { patient_id: selectedSketch.patient_id, emotion: selectedSketch.emotion },
+      });
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update status. Please try again.");
@@ -824,6 +847,19 @@ export default function ChildProgressDetail() {
           });
         }
       }
+
+      await logActivity({
+        action: 'session.created',
+        entity_type: 'child_event',
+        entity_id: newEvent.id,
+        entity_label: scheduleForm.title.trim(),
+        meta: {
+          event_type: scheduleForm.event_type,
+          patient_id: patient.id,
+          patient_name: patient.full_name,
+          scheduled_at: scheduled_at,
+        },
+      });
 
       setScheduleSuccess(true);
       setTimeout(() => {

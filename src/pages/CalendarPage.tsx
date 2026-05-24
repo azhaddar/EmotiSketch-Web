@@ -9,6 +9,7 @@ import { Plus, X, CalendarDays, Clock, User, FileText, Palette } from "lucide-re
 import EventModal from "../components/EventModal";
 import { EVENT_TYPES, CalEvent } from "../lib/calendarTypes";
 import { useNavigate } from "react-router-dom";
+import { logActivity } from "../lib/activityLog";
 
 const CHILD_EVENT_COLORS: Record<string, string> = {
   appointment:      "#10B981",
@@ -164,6 +165,14 @@ export default function CalendarPage() {
         prev.map(ev => ev.id === eventId ? { ...ev, parent_status: status } : ev)
       );
       setChildPopup(prev => prev ? { ...prev, parent_status: status } : prev);
+      const ev = childEvents.find(e => e.id === eventId);
+      await logActivity({
+        action: status === 'accepted' ? 'session.accepted' : 'session.rejected',
+        entity_type: 'child_event',
+        entity_id: eventId,
+        entity_label: ev?.title ?? 'Drawing session',
+        meta: { child_id: ev?.child_id, child_name: ev?.childName },
+      });
     } catch {
       alert("Failed to update. Please try again.");
     } finally {

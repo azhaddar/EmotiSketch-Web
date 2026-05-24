@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
-// 1. Add createClient to imports
 import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabaseClient";
+import { logActivity } from "../lib/activityLog";
 
 
 export default function AddUser() {
@@ -35,7 +36,7 @@ export default function AddUser() {
       );
 
       // 3. Use tempSupabase instead of the global 'supabase'
-      const { error: authError } = await tempSupabase.auth.signUp({
+      const { data: signUpData, error: authError } = await tempSupabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -47,6 +48,23 @@ export default function AddUser() {
       });
 
       if (authError) throw authError;
+
+      // Defensive upsert in case the DB trigger didn't fire
+      if (signUpData?.user) {
+        await supabase.from("profiles").upsert({
+          id:        signUpData.user.id,
+          full_name: formData.full_name,
+          email:     formData.email,
+          role:      formData.role,
+        }, { onConflict: "id" });
+      }
+
+      await logActivity({
+        action: 'user.created',
+        entity_type: 'user',
+        entity_label: formData.full_name,
+        meta: { email: formData.email, role: formData.role },
+      });
 
       alert("User account created successfully!");
       navigate("/dashboard/users");

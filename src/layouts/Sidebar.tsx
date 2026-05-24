@@ -11,6 +11,7 @@ import {
   BarChart3,
   GraduationCap,
   CalendarDays,
+  ScrollText,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { useEffect, useState } from "react";
@@ -99,6 +100,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       name: "Users",
       path: "/dashboard/users",
       icon: <ShieldUser size={20} />,
+      visible: role === "admin",
+    },
+    {
+      name: "Activity Log",
+      path: "/dashboard/activity-log",
+      icon: <ScrollText size={20} />,
       visible: role === "admin",
     },
     {

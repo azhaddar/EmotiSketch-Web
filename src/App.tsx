@@ -22,6 +22,7 @@ import TherapistList from "./pages/TherapistList";
 import TherapistProfile from "./pages/TherapistProfile";
 import Settings from "./pages/Settings";
 import CalendarPage from "./pages/CalendarPage";
+import ActivityLog from "./pages/ActivityLog";
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
           <Route path="users/edit/:id" element={<EditUser />} />
           <Route path="settings" element={<Settings />} />
           <Route path="calendar" element={<CalendarPage />} />
+          <Route path="activity-log" element={<ActivityLog />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
