@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, CheckCircle2, UserPlus } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { logActivity } from "../lib/activityLog";
 
 export default function AddPatient() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [addedChildName, setAddedChildName] = useState("");
 
   // State for logic
   const [currentUserRole, setCurrentUserRole] = useState("");
@@ -120,10 +122,8 @@ export default function AddPatient() {
         meta: { age: formData.age, gender: formData.gender },
       });
 
-      alert("Child profile added successfully!");
-
-      // Go back to previous page
-      navigate(-1);
+      setAddedChildName(formData.full_name);
+      setShowSuccess(true);
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -131,8 +131,44 @@ export default function AddPatient() {
     }
   }
 
+  function handleAddAnother() {
+    setShowSuccess(false);
+    setAddedChildName("");
+    setFormData({ full_name: "", age: "", gender: "Male", personality: "", guardian_id: currentUserRole === "user" ? formData.guardian_id : "" });
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-4 flex flex-col h-full justify-center">
+
+      {/* ── Success Modal ── */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-5">
+              <CheckCircle2 size={40} className="text-green-500" />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-1">All done!</h2>
+            <p className="text-gray-500 text-sm mb-1">Child profile created for</p>
+            <p className="text-[#e13d7d] text-lg font-bold mb-6">{addedChildName}</p>
+
+            <div className="w-full space-y-3">
+              <button
+                onClick={handleAddAnother}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#e13d7d] text-[#e13d7d] font-bold text-sm hover:bg-pink-50 transition-colors"
+              >
+                <UserPlus size={16} />
+                Add Another Child
+              </button>
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="w-full py-3 rounded-xl bg-[#e13d7d] text-white font-bold text-sm hover:bg-[#c42f6a] transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <button
         onClick={() => navigate(-1)} // Generic "Go Back" action
         className="flex items-center gap-2 text-gray-500 hover:text-[#e13d7d] transition-colors mb-3 group w-fit"
