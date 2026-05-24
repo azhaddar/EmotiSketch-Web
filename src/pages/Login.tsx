@@ -132,9 +132,9 @@ export default function Login() {
               </a>*/}
             </div>
             <div>
-              <a href="#" className="text-sm text-blue-600 hover:underline">
+              <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
                 Reset password
-              </a>
+              </Link>
             </div>
             <p className="text-sm text-gray-600">
               No account?{" "}
