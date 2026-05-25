@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { X, Search, UserPlus, Trash2, MapPin, FileText, Check } from "lucide-react";
-import { EVENT_TYPES, CalEvent, Guest } from "../lib/calendarTypes";
+import { EVENT_TYPES } from "../lib/calendarTypes";
+import type { CalEvent, Guest } from "../lib/calendarTypes";
 
 const STATUS_STYLE: Record<string, string> = {
   pending:  "bg-yellow-50 text-yellow-700 border-yellow-200",

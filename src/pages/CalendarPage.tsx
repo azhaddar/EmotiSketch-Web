@@ -7,7 +7,8 @@ import listPlugin from "@fullcalendar/list";
 import { supabase } from "../lib/supabaseClient";
 import { Plus, X, CalendarDays, Clock, User, FileText, Palette } from "lucide-react";
 import EventModal from "../components/EventModal";
-import { EVENT_TYPES, CalEvent } from "../lib/calendarTypes";
+import { EVENT_TYPES } from "../lib/calendarTypes";
+import type { CalEvent } from "../lib/calendarTypes";
 import { useNavigate } from "react-router-dom";
 import { logActivity } from "../lib/activityLog";
 

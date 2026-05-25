@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { ChevronLeft, ChevronRight, Plus, ExternalLink } from "lucide-react";
-import { EVENT_TYPES, CalEvent } from "../lib/calendarTypes";
+import { EVENT_TYPES } from "../lib/calendarTypes";
+import type { CalEvent } from "../lib/calendarTypes";
 import EventModal from "./EventModal";
 
 const DAYS   = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
