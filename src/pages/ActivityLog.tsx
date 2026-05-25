@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   Activity, UserPlus, Users, PenLine, CheckCircle, ShieldCheck,
-  Trash2, CalendarPlus, ThumbsUp, ThumbsDown, RefreshCw, ChevronLeft, ChevronRight,
+  Trash2, CalendarPlus, ThumbsUp, ThumbsDown, RefreshCw, ChevronLeft, ChevronRight, FileText,
 } from "lucide-react";
 
 interface LogEntry {
@@ -23,12 +23,14 @@ const ACTION_CONFIG: Record<string, {
   category: string;
 }> = {
   "patient.created":            { label: "Child added",             icon: <UserPlus size={14} />,     bg: "bg-blue-100",    color: "text-blue-600",    category: "patient"  },
+  "patient.updated":            { label: "Child profile updated",   icon: <RefreshCw size={14} />,    bg: "bg-teal-100",    color: "text-teal-600",    category: "patient"  },
   "patient.therapist_assigned": { label: "Therapist assigned",      icon: <Users size={14} />,        bg: "bg-indigo-100",  color: "text-indigo-600",  category: "patient"  },
   "patient.status_changed":     { label: "Status changed",          icon: <Activity size={14} />,     bg: "bg-gray-100",    color: "text-gray-600",    category: "patient"  },
   "sketch.submitted":           { label: "Drawing submitted",       icon: <PenLine size={14} />,      bg: "bg-purple-100",  color: "text-purple-600",  category: "clinical" },
   "sketch.reviewed":            { label: "Drawing marked reviewing",icon: <CheckCircle size={14} />,  bg: "bg-amber-100",   color: "text-amber-600",   category: "clinical" },
   "sketch.verified":            { label: "Drawing verified",        icon: <ShieldCheck size={14} />,  bg: "bg-emerald-100", color: "text-emerald-600", category: "clinical" },
   "sketch.deleted":             { label: "Drawing deleted",         icon: <Trash2 size={14} />,       bg: "bg-red-100",     color: "text-red-600",     category: "clinical" },
+  "therapist.notes_added":      { label: "Therapist notes saved",   icon: <FileText size={14} />,     bg: "bg-sky-100",     color: "text-sky-600",     category: "clinical" },
   "session.created":            { label: "Session scheduled",       icon: <CalendarPlus size={14} />, bg: "bg-violet-100",  color: "text-violet-600",  category: "schedule" },
   "session.accepted":           { label: "Session accepted",        icon: <ThumbsUp size={14} />,     bg: "bg-green-100",   color: "text-green-600",   category: "schedule" },
   "session.rejected":           { label: "Session rejected",        icon: <ThumbsDown size={14} />,   bg: "bg-red-100",     color: "text-red-600",     category: "schedule" },

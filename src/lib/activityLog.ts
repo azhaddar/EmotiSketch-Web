@@ -3,11 +3,13 @@ import { supabase } from './supabaseClient';
 export type ActivityAction =
   // Patients
   | 'patient.created'
+  | 'patient.updated'
   | 'patient.therapist_assigned'
   | 'patient.status_changed'
   // Sketches
   | 'sketch.submitted'
   | 'sketch.reviewed'
+  | 'therapist.notes_added'
   | 'sketch.verified'
   | 'sketch.deleted'
   // Drawing sessions

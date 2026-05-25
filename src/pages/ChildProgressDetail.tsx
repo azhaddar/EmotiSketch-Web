@@ -704,6 +704,13 @@ export default function ChildProgressDetail() {
         .eq("id", patient.id);
       if (error) throw error;
       setPatient(prev => prev ? { ...prev, status: newStatus } : prev);
+      await logActivity({
+        action: 'patient.status_changed',
+        entity_type: 'patient',
+        entity_id: patient.id,
+        entity_label: patient.full_name,
+        meta: { new_status: newStatus },
+      });
       setStatusSaved(true);
       setTimeout(() => setStatusSaved(false), 3000);
     } catch (err) {
@@ -789,6 +796,13 @@ export default function ChildProgressDetail() {
       const saved = noteText.trim() || null;
       setSketches(prev => prev.map(s => s.id === selectedSketch.id ? { ...s, therapist_notes: saved } : s));
       setSelectedSketch(prev => prev ? { ...prev, therapist_notes: saved } : prev);
+      await logActivity({
+        action: 'therapist.notes_added',
+        entity_type: 'sketch',
+        entity_id: selectedSketch.id,
+        entity_label: `${selectedSketch.emotion} sketch — ${patient?.full_name ?? ''}`,
+        meta: { patient_id: selectedSketch.patient_id },
+      });
       setNoteSaved(true);
       setTimeout(() => setNoteSaved(false), 3000);
     } catch (err) {
