@@ -52,7 +52,6 @@ interface Sketch {
   image_url?: string | null;
   score?: number | null;
   analysis?: string | null;
-  therapist_message?: string | null;
   htp_features?: Array<{
     category: string;
     observation: string;
@@ -1532,7 +1531,7 @@ export default function ChildProgressDetail() {
 
                     {/* Description */}
                     <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 flex-1">
-                      {sketch.therapist_message || fallbackDesc}
+                      {fallbackDesc}
                     </p>
 
                     {/* Footer */}

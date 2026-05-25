@@ -774,10 +774,9 @@ serve(async (req: Request) => {
     const obsCount = scores[emotion] >= 25 ? "4 to 5" : "2 to 3";
     const preMoodLine = preMood ? `\nThe child said they felt "${preMood}" before drawing.` : "";
     const contrastNote = preMood && preMood !== emotion
-      ? `The child said they felt "${preMood}" before drawing but the drawing shows "${emotion}". Gently acknowledge this difference and reassure them it is normal.`
+      ? `The child's reported pre-mood was "${preMood}" but the drawing shows "${emotion}". Note this contrast in your observations if relevant.`
       : "";
 
-    let therapistMessage = "";
     let htpFeatures: Array<{
       category: string;
       observation: string;
@@ -810,7 +809,6 @@ ${contrastNote}
 
 Using the AD-HTP/DAP signal reference in your system prompt, examine this drawing carefully and return ONLY this JSON (no markdown, no extra text outside the braces):
 {
-  "therapistMessage": "<3 sentences, simple words a 6-year-old understands, speak directly to the child, mention specific things you see in the drawing such as colors or shapes, be warm and encouraging, use only commas and full stops as punctuation>",
   "htpFeatures": [
     {
       "category": "<must be one of: ${htpCategories}>",
@@ -822,7 +820,6 @@ Using the AD-HTP/DAP signal reference in your system prompt, examine this drawin
 }
 
 Rules:
-- therapistMessage: exactly 3 sentences, no bullet points, no line breaks, no dashes
 - htpFeatures: ${obsCount} entries — list signals for the dominant emotion (${emotion}) FIRST, then secondary signals; never list randomly
 - Only include Tree Elements entries if a tree is actually visible in the drawing
 - For body-part absence signals (e.g. "Missing legs", "Hands omitted"), only include if the figure is drawn fully enough to confirm the part is intentionally absent — never flag absence on a partial or cropped drawing
@@ -846,14 +843,6 @@ Rules:
 
       const parsed = JSON.parse(cleaned);
 
-      therapistMessage = (parsed.therapistMessage ?? "")
-        .replace(/—/g, ",")
-        .replace(/–/g, ",")
-        .replace(/--/g, ",")
-        .replace(/^\s*[-*•]\s+/gm, "")
-        .replace(/\n+/g, " ")
-        .trim();
-
       if (Array.isArray(parsed.htpFeatures)) {
         htpFeatures = parsed.htpFeatures
           .filter((f: any) =>
@@ -874,7 +863,7 @@ Rules:
     }
 
     return new Response(
-      JSON.stringify({ valid: true, emotion, scores, therapistMessage, htpFeatures }),
+      JSON.stringify({ valid: true, emotion, scores, htpFeatures }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
