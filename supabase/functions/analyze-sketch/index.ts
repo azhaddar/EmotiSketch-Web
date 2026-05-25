@@ -474,36 +474,98 @@ ENVIRONMENT & SYMBOLS:
 • House centrally placed and well-proportioned → HAPPY: confidence, stability
 
 TREE ELEMENTS (include only if a tree is visually present):
-• Broken or dashed trunk lines / batang putus-putus → ANXIOUS SEVERE: highly anxious, volatile, prone to emotional fragmentation — the defining Malaysian AD-HTP anxious trunk marker
-• Split or severed roots / akar terpisah dua → ANXIOUS SEVERE: family loyalty violently torn between two sides
-• Swaying or leaning trunk / batang pokok bergoyang → ANXIOUS: volatile emotional instability
-• Trunk narrowing toward top / batang semakin mengecil ke atas → ANXIOUS: dwindling emotional energy, gradual withdrawal
-• Dead or dried roots / akar mati → ANXIOUS: complete disconnection from family support
-• Holes or scars on trunk (age 9+) / lubang atau parut pada batang → ANXIOUS/SAD: emotional trauma from past event
-• Animals on the tree / binatang di atas pokok → ANXIOUS: hiding something for safety, discomfort in relationships
-• Shading on trunk / lorekan pada batang pokok → ANXIOUS: anxiety
-• Vertical lines on trunk → ANXIOUS: high defensive emotional walls
-• Dark clouds or storm over tree → ANXIOUS: anxiety, sense of threat
-• Dead tree / pokok mati → SAD: helpless victim mentality, avoids responsibility
-• Tree stump / tunggul pokok → SAD: complete giving up, severe lack of drive
+
+TREE TYPE & SPECIES:
+• Lollipop tree / pokok lolipop → SAD: limits emotional expression, retreats into isolation; often needs solitude and pushes others away
+• Dead tree / pokok mati → SAD: feels like a helpless victim of circumstances, tends to blame others and avoid personal responsibility
+• Tree stump / tunggul pokok → SAD: complete giving up; needs external motivation and encouragement to face challenges
+• Leafless or bare winter tree → SAD: intensely sensitive and easily offended; honest and giving but emotionally fragile
+• Weeping willow / pokok dahan ke bawah → ANXIOUS: overly protective, prone to superstitious thinking about certain situations
+• Palm or coconut tree → ANXIOUS: aspires to high challenging goals but easily bored with routine; rigid and hard to accept non-traditional situations
+• Spring tree with partial foliage → ANXIOUS: impressionable and easily influenced by environment; still developing emotional stability
+• Many of the same tree repeated → ANXIOUS: personal identity strongly tied to group membership; feels strength only through belonging
+• Summer tree with full foliage → HAPPY: emotionally well-adjusted, plans carefully, confident in own direction
+• Pine tree → HAPPY: goal-oriented, focused and enthusiastic once committed to a direction
+• Christmas tree → HAPPY: romantic, friendly, prioritises others' feelings above own
+• Apple tree → HAPPY: achievement-focused with positive self-esteem; believes only meaningful activity is worth pursuing
+• Multiple treetops / puncak berganda → HAPPY: many ambitions and abilities; sees life and problems from multiple perspectives
+• More than one kind of tree → HAPPY: versatile; uses multiple approaches to solve problems
+
+TREE LOCATION & WIND DIRECTION:
+• Tree centrally placed and well-proportioned → HAPPY: confidence and stability; balanced childhood and present life
+• Tree positioned at top-centre of page → ANXIOUS: craves stimulation and social ideals; easily bored with routine
+• Tree positioned on left side of page → SAD: past-focused, driven by early memories; needs external push to move forward
+• Tree positioned in corner / kedudukan di penjuru sudut kertas → SAD: low confidence, withdrawal from environment
+• Branches visibly bent left-to-right → ANXIOUS: actively trying to cope with environmental pressure though still under strain
+• Branches visibly bent right-to-left → ANXIOUS: low ability to cope with experienced pressure
+• Branches bent in all directions → ANXIOUS SEVERE: experiencing severe and overwhelming pressure from all directions in life
+• Branches bent bottom-to-top → ANXIOUS: avoidance — escapes into fantasy when facing pressure rather than confronting it
+• Branches bent top-to-bottom → ANXIOUS: attempting to bring internal pressure into reality to deal with it
+
+CANOPY & FOLIAGE:
 • Completely darkened canopy / kanopi berlorek penuh → SAD: suppression and denial of painful realities
-• Dead or drooping branches / ranting mati atau layu → SAD: resignation, emotional exhaustion
-• Lollipop tree / pokok lolipop → SAD: limits emotional expression, retreats into isolation
-• Leafless or winter tree → SAD: intensely sensitive, withdrawn
-• Too many branches on large trunk / terlalu banyak ranting dengan batang besar → SAD: profound loneliness
-• Very small tree / pokok terlalu kecil → SAD: low self-concept
-• Tree in corner / kedudukan di penjuru sudut kertas → SAD: low confidence, withdrawal
-• Fallen fruit / buah kelihatan gugur → SAD: guilt, shame, far from blessings
-• Bird's nest in tree / sarang burung → SAD: craving for safety and protection from the past
-• Bird perched on branch / burung hinggap pada dahan → SAD: desire for freedom
+• Darkened or heavily shaded canopy → ANXIOUS: hides or denies true feelings when unable to process past situations; diverts focus to reduce anxiety feelings
+• Half-darkened canopy → ANXIOUS/SAD: avoids uncomfortable situations; causes internal confusion and reduced life enthusiasm
+• Open or hollow tree top → SAD: currently lacks direction and clear dreams; underestimates own potential and confidence
+• Umbrella or mushroom-shaped canopy → SAD SEVERE: very low self-image, chronic self-criticism, persistent guilt feelings — significant clinical concern
+• Triangle-shaped canopy → ANXIOUS/SAD: goal-focused but emotionally suppressed; does not prioritise emotion in decisions
+• Flame or teardrop-shaped canopy → ANGRY: high aspirations and strong drive; actively suppresses emotion from decision-making
+• Closed round canopy → ANXIOUS: strongly defends own beliefs; closed to outside influence; feels need to be protected
+• Canopy extends beyond page border → ANXIOUS: overextends into too many areas at once; generous but may sacrifice own wellbeing
 • Spiky or sharp foliage / ranting tajam-tajam → ANGRY: deep-seated hostility
+• Dead or drooping branches / ranting mati atau layu → SAD: resignation, emotional exhaustion
+
+BRANCHES:
+• Too many branches on large trunk / terlalu banyak ranting dengan batang besar → SAD: profound loneliness
+• Broken or jagged branches → SAD/ANGRY: facing obstacles causing frustration and deep disappointment
+• Branches only on one side of trunk without centre division → ANXIOUS/ANGRY: rigid black-and-white thinking; sees situations as only right or wrong without finding middle ground
+• Open or unfinished branch ends → ANXIOUS: currently has an unresolved situation; losing focus and struggling to complete tasks
+• Branches disconnected from trunk entirely → SAD/ANXIOUS: needs help from others when facing difficulties; cannot cope independently
+• Bird perched on branch / burung hinggap pada dahan → SAD: desire for freedom
+• Bird's nest in tree / sarang burung → SAD: craving for safety and protection from the past
+• Fallen fruit / buah kelihatan gugur → SAD: guilt, shame, feeling far from blessings
+• Birds or animals peacefully on tree → HAPPY: companionship, social ease, supportive relationships
+• Fruits on tree / buah pada pokok → HAPPY: wanting relationships and affection; confident in own capability to achieve goals
+• Flowers on tree / bunga pada pokok → HAPPY: social, pleasant disposition; romantic outlook on life
+• Gifts or decorations on tree / hadiah atau hiasan pada pokok → HAPPY: desire for celebration and recognition; likes to give
+• Branches all drawn upward → HAPPY: goal-oriented; uses clear and focused approach toward dreams
+
+TRUNK:
+• Broken or dashed trunk lines / batang putus-putus → ANXIOUS SEVERE: highly anxious and volatile; acts on feelings rather than reason — the defining Malaysian AD-HTP anxious trunk marker
+• Swaying or leaning trunk / batang pokok bergoyang → ANXIOUS: volatile emotional instability
+• Trunk narrowing toward top / batang semakin mengecil ke atas → ANXIOUS: dwindling emotional energy; sometimes too emotional and may lose self-control
+• Middle section of trunk narrowing → SAD/ANXIOUS: past failure to control emotions has left a deep impact on current feelings
+• Curved or wavy trunk → ANXIOUS: too optimistic and easily influenced; affected by emotionally unstable situations
+• Shading on trunk / lorekan pada batang pokok → ANXIOUS: anxiety; heavily worried about what is happening in home life
+• Vertical lines on trunk → ANXIOUS: high defensive emotional walls; protecting self from external emotional disturbances
+• Trunk wider at the bottom → ANXIOUS: strong emotional power; most decisions guided by instinct and intuition rather than logic
+• Elongated tall trunk → ANXIOUS: building emotional wisdom; trying to balance personal beliefs with rational facts
+• Holes or scars on trunk (age 9+) / lubang atau parut pada batang → ANXIOUS/SAD: emotional trauma from a past event
+• Multiple holes on trunk → SAD SEVERE: traumatic childhood experiences such as loss or emergencies that left a deep and lasting emotional impact
+• Hole with shading or darkening on trunk → SAD/ANXIOUS: experiences hard to forget associated with shame and guilt
+• Knothole in drawing by child aged 12 or under → ANXIOUS: represents a door to an exciting fantasy world; child prefers to live in fantasy rather than face reality
+• Animals on the tree / binatang di atas pokok → ANXIOUS: hiding something for safety; discomfort in relationships
+• Dark clouds or storm over tree → ANXIOUS: anxiety, sense of looming threat
+• Storm or severe weather around tree → ANXIOUS SEVERE: feeling of a severely pressured and hostile environment
+• Rain around or over tree → SAD: not yet achieving satisfaction in life
+
+ROOTS:
+• Split or severed roots / akar terpisah dua → ANXIOUS SEVERE: family loyalty violently torn between two sides due to past events
+• Dead or dried roots / akar mati → ANXIOUS: complete disconnection from family support
+• Sharp or fang-like roots / akar tajam atau taring → ANGRY: aggressive craving for security and material ownership
+• Roots extending beyond page border → ANXIOUS: feels pressured by family from many different directions simultaneously
+• Roots drawn on the side of trunk → ANXIOUS/SAD: emotionally dependent on others for support; wants more family involvement
+• Wavy roots → ANXIOUS: prefers leisure over disciplined hard work; prioritises personal pleasure over social recognition
+• Animal in knothole / binatang di lubang batang → ANXIOUS: confused mixed feelings from childhood; unsure whether past experiences were normal or traumatic
+• No roots with open base → HAPPY: confident in own abilities when facing challenges; values independence and freedom
+• Roots drawn below a ground line → HAPPY: realistic perspective on life; good self-control; family is a source of stability
+• Two-dimensional roots → HAPPY: family is very important; emotional stability comes from family connection
+• Roots connected to trunk → HAPPY: family and cultural traditions play an important and stabilising role in life
+
+GENERAL:
+• Very small tree / pokok terlalu kecil → SAD: low self-concept
 • Extremely large tree dominating page / pokok sangat besar menguasai halaman → ANGRY: resistance to authority
-• Sharp or fang-like roots / akar tajam atau taring → ANGRY: aggressive craving for security
-• Full lush summer tree in warm palette → HAPPY: well-adjusted, emotionally balanced
-• Fruits on tree / buah pada pokok → HAPPY: wanting relationships and affection
-• Flowers on tree / bunga pada pokok → HAPPY: social, pleasant disposition
-• Birds or animals peacefully on tree → HAPPY: companionship, social ease
-• Gifts or decorations on tree / hadiah atau hiasan pada pokok → HAPPY: desire for celebration and recognition
+• Full lush summer tree in warm colour palette → HAPPY: well-adjusted and emotionally balanced
 • Sun above tree in positive context → HAPPY: positive relationship with authority figure`;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -535,6 +597,8 @@ FIGURE SIZE & LINE QUALITY:
 • Figure's name or face crossed out or scribbled over → SAD: self-rejection, low self-worth
 • Figure entirely in red or black with slashing strokes → ANGRY: intense aggression
 • Heavy forceful overlapping strokes / tahap tekanan terlalu kuat → ANGRY: concentrated aggression
+• Figure drawn as opposite gender to the child → ANXIOUS: may suggest gender identity confusion or uncertainty — clinically significant per AD-HTP/DAP framework
+• Figure drawn significantly younger than the child's actual age → SAD/ANXIOUS: may suggest regression or desire to return to a less responsible, more dependent stage of development
 
 HEAD:
 • Oversized head relative to body → ANXIOUS: rumination, overthinking, anxious preoccupation
@@ -590,6 +654,9 @@ BODY & POSTURE:
 • Rain falling over figure → SAD: sadness, depression
 • Raised fists or body lunging forward → ANGRY: overt aggression
 • Tightly clenched fists at sides / tangan membentuk penumbuk → ANGRY: suppressed contained rage
+• Figure watching others play without participating → SAD: social isolation, emotional coldness and difficulty engaging with others
+• Figure performing martial arts or self-defence actions → ANGRY: internal conflict, desire to assert dominance or become tougher
+• Figure running toward water or a river → SAD/ANXIOUS: desire to escape from environmental pressure and current life situation
 • Complete figure with all parts plus confident lines → HAPPY: emotional wellbeing, positive self-image
 • Upright proud confident posture → HAPPY: confidence, positive self-image
 • Arms extended outward or raised joyfully → HAPPY: joy, open emotional state
@@ -618,8 +685,11 @@ ENVIRONMENTAL CONTEXT & SYMBOLS:
 • Drum / dram atau gendang → ANGRY: suppressed anger
 • Sharp tools or axes / mesin potong, kapak → ANGRY: competition, dominance
 • Poisonous or attacking animal / binatang berbisa → ANGRY: revenge, aggression
+• Storm or heavy rain as weather setting → ANXIOUS: pressured and strained interpersonal relationships
+• Winter or cold scene as weather setting → SAD: low interpersonal intimacy, emotional coldness in relationships
 • Bright warm multi-color palette with no dark tone → HAPPY: emotional wellbeing
 • Positive background elements (sunshine, flowers, rainbow, family) → HAPPY: positive outlook
+• Hot sunny clear weather as background setting → HAPPY: warm and close interpersonal relationships
 • Smiling bright sun in positive context → HAPPY: wanting love and warmth
 • Flowers in positive composition / bunga → HAPPY: searching for love and beauty
 • Family or friends drawn nearby → HAPPY: belonging
@@ -701,6 +771,7 @@ serve(async (req: Request) => {
     // ── Call 2: Therapist message + HTP clinical features ────────────────────
     const drawingType = promptType === "house" ? "house drawing" : "self-portrait";
     const scoresSummary = VALID_EMOTIONS.map((e) => `${e}: ${scores[e]} pts`).join(", ");
+    const obsCount = scores[emotion] >= 25 ? "4 to 5" : "2 to 3";
     const preMoodLine = preMood ? `\nThe child said they felt "${preMood}" before drawing.` : "";
     const contrastNote = preMood && preMood !== emotion
       ? `The child said they felt "${preMood}" before drawing but the drawing shows "${emotion}". Gently acknowledge this difference and reassure them it is normal.`
@@ -752,12 +823,13 @@ Using the AD-HTP/DAP signal reference in your system prompt, examine this drawin
 
 Rules:
 - therapistMessage: exactly 3 sentences, no bullet points, no line breaks, no dashes
-- htpFeatures: 3 to 5 entries — match what you see in the drawing to named signals in the AD-HTP/DAP reference; prioritise signals that explain the dominant emotion (${emotion})
-- Only include a Tree Elements entry if a tree is actually visible in the drawing
-- severity: 1-3 = developmentally normal for age, 4-6 = noteworthy clinical indicator, 7-10 = significant concern requiring follow-up
-- Every observation must reference a named signal from the AD-HTP/DAP reference, in English only
-- Every interpretation must cite the clinical meaning as described in the reference
-- Base all observations only on what is visually present in the drawing`,
+- htpFeatures: ${obsCount} entries — list signals for the dominant emotion (${emotion}) FIRST, then secondary signals; never list randomly
+- Only include Tree Elements entries if a tree is actually visible in the drawing
+- For body-part absence signals (e.g. "Missing legs", "Hands omitted"), only include if the figure is drawn fully enough to confirm the part is intentionally absent — never flag absence on a partial or cropped drawing
+- severity: map directly to AD-HTP signal tier — STRONG signal → 7–10, MODERATE signal → 4–6, CONTEXTUAL signal → 1–3
+- Every observation must reference a named signal from the AD-HTP/DAP signal reference, in English only
+- Every interpretation must use exploratory language: "may suggest", "per AD-HTP this may indicate" — never use definitive language such as "means" or "proves"
+- Base all observations only on what is visually present in the drawing; do not infer what cannot be seen`,
               },
             ],
           },
