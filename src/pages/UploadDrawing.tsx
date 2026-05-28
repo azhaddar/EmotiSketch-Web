@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { EmotionIcon } from "../components/EmotionIcon";
-import { Upload, ImagePlus, ChevronRight, X } from "lucide-react";
+import { Upload, ImagePlus, X, CheckCircle, ChevronRight } from "lucide-react";
 
 interface Patient {
   id: string;
@@ -22,17 +22,16 @@ interface AnalysisResult {
   emotion: "happy" | "sad" | "angry" | "anxious";
   scores: Record<string, number>;
   htpFeatures: HtpFeature[];
-  sketchId: string;
   patientId: string;
 }
 
 const EMOTIONS = ["happy", "sad", "angry", "anxious"] as const;
 
-const EMOTION_STYLES: Record<string, { bg: string; text: string; border: string; pill: string }> = {
-  happy:   { bg: "bg-amber-50",  text: "text-amber-800",  border: "border-amber-200",  pill: "bg-amber-100 text-amber-800 border-amber-300" },
-  sad:     { bg: "bg-blue-50",   text: "text-blue-800",   border: "border-blue-200",   pill: "bg-blue-100 text-blue-800 border-blue-300" },
-  angry:   { bg: "bg-red-50",    text: "text-red-800",    border: "border-red-200",    pill: "bg-red-100 text-red-800 border-red-300" },
-  anxious: { bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200", pill: "bg-purple-100 text-purple-800 border-purple-300" },
+const EMOTION_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  happy:   { bg: "bg-amber-50",  text: "text-amber-800",  border: "border-amber-200" },
+  sad:     { bg: "bg-blue-50",   text: "text-blue-800",   border: "border-blue-200" },
+  angry:   { bg: "bg-red-50",    text: "text-red-800",    border: "border-red-200" },
+  anxious: { bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200" },
 };
 
 const SCORE_BAR_COLORS: Record<string, string> = {
@@ -52,14 +51,12 @@ export default function UploadDrawing() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [userId, setUserId] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
 
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [drawingType, setDrawingType] = useState<"house" | "self">("house");
-  const [preMood, setPreMood] = useState<string>("");
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -73,7 +70,6 @@ export default function UploadDrawing() {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setUserId(user.id);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -91,7 +87,7 @@ export default function UploadDrawing() {
       } else if (userRole === "therapist") {
         query = query.eq("therapist_id", user.id);
       }
-      // admin: no filter — sees all
+      // admin: no filter
 
       const { data } = await query.order("full_name");
       setPatients(data ?? []);
@@ -130,6 +126,14 @@ export default function UploadDrawing() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function resetForm() {
+    setSelectedPatientId("");
+    setDrawingType("house");
+    clearImage();
+    setError("");
+    setResult(null);
+  }
+
   async function handleAnalyze() {
     if (!selectedPatientId) { setError("Please select a child."); return; }
     if (!imageFile) { setError("Please upload a drawing image."); return; }
@@ -150,7 +154,7 @@ export default function UploadDrawing() {
           body: {
             imageBase64: base64,
             promptType: drawingType,
-            preMood: preMood || null,
+            preMood: null,
           },
         }),
       ]);
@@ -172,7 +176,7 @@ export default function UploadDrawing() {
       const scores = analyzeResult.data?.scores ?? null;
       const htpFeatures = analyzeResult.data?.htpFeatures ?? [];
 
-      const { data: sketchRow, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("sketches")
         .insert({
           patient_id: selectedPatientId,
@@ -181,10 +185,7 @@ export default function UploadDrawing() {
           image_url: urlData.publicUrl,
           scores: scores ?? null,
           htp_features: htpFeatures,
-          pre_mood: preMood || null,
-        })
-        .select("id")
-        .single();
+        });
 
       if (insertError) throw insertError;
 
@@ -192,7 +193,6 @@ export default function UploadDrawing() {
         emotion,
         scores: scores ?? {},
         htpFeatures,
-        sketchId: sketchRow.id,
         patientId: selectedPatientId,
       });
     } catch (e: any) {
@@ -201,6 +201,8 @@ export default function UploadDrawing() {
       setAnalyzing(false);
     }
   }
+
+  const isTherapistOrAdmin = role === "therapist" || role === "admin";
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-5 pb-16">
@@ -224,7 +226,7 @@ export default function UploadDrawing() {
           ) : (
             <select
               value={selectedPatientId}
-              onChange={(e) => { setSelectedPatientId(e.target.value); setResult(null); }}
+              onChange={(e) => setSelectedPatientId(e.target.value)}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none transition-all text-sm bg-white"
             >
               <option value="">— Select a child —</option>
@@ -238,12 +240,12 @@ export default function UploadDrawing() {
         </div>
       </div>
 
-      {/* Step 2 — Drawing Type & Pre-Mood */}
+      {/* Step 2 — Drawing Type */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
           <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Step 2 — Drawing Type</p>
         </div>
-        <div className="p-5 space-y-5">
+        <div className="p-5">
           <div className="grid grid-cols-2 gap-3">
             {(["house", "self"] as const).map((type) => (
               <button
@@ -263,27 +265,6 @@ export default function UploadDrawing() {
                 </p>
               </button>
             ))}
-          </div>
-
-          <div>
-            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
-              Pre-Mood <span className="font-normal normal-case text-gray-400">(optional)</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {EMOTIONS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setPreMood(preMood === e ? "" : e)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all capitalize ${
-                    preMood === e
-                      ? EMOTION_STYLES[e].pill + " border-2"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300"
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -364,89 +345,134 @@ export default function UploadDrawing() {
         )}
       </button>
 
-      {/* Results */}
-      {result && <AnalysisResultPanel result={result} />}
+      {/* Success Modal */}
+      {result && (
+        <SuccessModal
+          result={result}
+          showClinical={isTherapistOrAdmin}
+          onClose={resetForm}
+          onViewProfile={() => navigate(`/dashboard/children/${result.patientId}`)}
+        />
+      )}
     </div>
   );
 }
 
-function AnalysisResultPanel({ result }: { result: AnalysisResult }) {
-  const navigate = useNavigate();
-  const { emotion, scores, htpFeatures, patientId } = result;
+function SuccessModal({
+  result,
+  showClinical,
+  onClose,
+  onViewProfile,
+}: {
+  result: AnalysisResult;
+  showClinical: boolean;
+  onClose: () => void;
+  onViewProfile: () => void;
+}) {
+  const { emotion, scores, htpFeatures } = result;
   const style = EMOTION_STYLES[emotion] ?? EMOTION_STYLES.happy;
-
   const maxScore = Math.max(...Object.values(scores), 1);
 
   return (
-    <div className="space-y-4">
-      {/* Emotion result card */}
-      <div className={`rounded-2xl border p-5 ${style.bg} ${style.border}`}>
-        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Analysis Result</p>
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${style.bg} border ${style.border}`}>
-            <EmotionIcon emotion={emotion} size={28} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-100 flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle size={22} className="text-green-600" />
+            </div>
+            <div>
+              <p className="font-bold text-gray-900">Analysis Complete</p>
+              <p className="text-xs text-gray-500">Drawing submitted successfully</p>
+            </div>
           </div>
-          <div>
-            <p className={`text-xl font-bold capitalize ${style.text}`}>{emotion}</p>
-            <p className="text-xs text-gray-500">Dominant emotion detected</p>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Score bars */}
-        <div className="space-y-2">
-          {EMOTIONS.map((e) => {
-            const score = scores[e] ?? 0;
-            const pct = Math.round((score / maxScore) * 100);
-            return (
-              <div key={e} className="flex items-center gap-3">
-                <p className="text-xs w-14 capitalize text-gray-600 font-medium">{e}</p>
-                <div className="flex-1 bg-white/60 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`h-2 rounded-full transition-all ${SCORE_BAR_COLORS[e]}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 w-8 text-right">{score}</p>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1">
+          {/* Emotion result */}
+          <div className={`m-4 rounded-xl border p-4 ${style.bg} ${style.border}`}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${style.border} ${style.bg}`}>
+                <EmotionIcon emotion={emotion} size={24} />
               </div>
-            );
-          })}
+              <div>
+                <p className={`text-lg font-bold capitalize ${style.text}`}>{emotion}</p>
+                <p className="text-xs text-gray-500">Dominant emotion detected</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {EMOTIONS.map((e) => {
+                const score = scores[e] ?? 0;
+                const pct = Math.round((score / maxScore) * 100);
+                return (
+                  <div key={e} className="flex items-center gap-3">
+                    <p className="text-xs w-14 capitalize text-gray-600 font-medium">{e}</p>
+                    <div className="flex-1 bg-white/60 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full ${SCORE_BAR_COLORS[e]}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 w-8 text-right">{score}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Clinical observations — therapist/admin only */}
+          {showClinical && htpFeatures.length > 0 && (
+            <div className="mx-4 mb-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Clinical Observations</p>
+                <p className="text-xs text-gray-400 mt-0.5">Based on AD-HTP methodology</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {htpFeatures.map((f, i) => {
+                  const sev = getSeverityMeta(f.severity);
+                  return (
+                    <div key={i} className="p-4 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{f.category}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sev.color}`}>
+                          {sev.label} · {f.severity}/10
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-800">{f.observation}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed">{f.interpretation}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer buttons */}
+        <div className="p-4 border-t border-gray-100 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
+          >
+            Upload Another
+          </button>
+          <button
+            onClick={onViewProfile}
+            className="flex-1 py-2.5 rounded-xl bg-[#e13d7d] text-white text-sm font-bold hover:bg-[#c42f6a] transition-all flex items-center justify-center gap-1.5"
+          >
+            View Profile
+            <ChevronRight size={15} />
+          </button>
         </div>
       </div>
-
-      {/* Clinical observations */}
-      {htpFeatures.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Clinical Observations</p>
-            <p className="text-xs text-gray-400 mt-0.5">Based on AD-HTP methodology</p>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {htpFeatures.map((f, i) => {
-              const sev = getSeverityMeta(f.severity);
-              return (
-                <div key={i} className="p-4 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{f.category}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sev.color}`}>
-                      {sev.label} · {f.severity}/10
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-800">{f.observation}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{f.interpretation}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={() => navigate(`/dashboard/children/${patientId}`)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#e13d7d] text-[#e13d7d] font-bold hover:bg-pink-50 transition-all text-sm"
-      >
-        View in Child Profile
-        <ChevronRight size={16} />
-      </button>
     </div>
   );
 }
@@ -456,7 +482,6 @@ async function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip data URL prefix (e.g. "data:image/jpeg;base64,")
       const base64 = result.split(",")[1];
       resolve(base64);
     };
