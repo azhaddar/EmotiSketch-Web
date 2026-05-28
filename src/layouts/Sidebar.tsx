@@ -113,7 +113,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       name: "Upload Drawing",
       path: "/dashboard/upload-drawing",
       icon: <Upload size={20} />,
-      visible: role === "parent" || role === "user" || role === "therapist",
+      visible: role === "parent" || role === "user",
     },
     {
       name: "Calendar",
