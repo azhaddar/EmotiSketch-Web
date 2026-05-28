@@ -12,6 +12,7 @@ import {
   GraduationCap,
   CalendarDays,
   ScrollText,
+  Upload,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { useEffect, useState } from "react";
@@ -107,6 +108,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       path: "/dashboard/activity-log",
       icon: <ScrollText size={20} />,
       visible: role === "admin",
+    },
+    {
+      name: "Upload Drawing",
+      path: "/dashboard/upload-drawing",
+      icon: <Upload size={20} />,
+      visible: role === "parent" || role === "user" || role === "therapist",
     },
     {
       name: "Calendar",
