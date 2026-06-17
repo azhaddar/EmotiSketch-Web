@@ -88,12 +88,19 @@ export default function Settings() {
       .from("profiles")
       .select("full_name, email, role, created_at")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (data) {
-      setProfile({ ...data, email: user.email ?? data.email });
-      setFullName(data.full_name ?? "");
-    }
+    const meta = user.user_metadata ?? {};
+    const resolvedName = data?.full_name || meta.full_name || "";
+    const resolvedRole = data?.role || meta.role || "user";
+
+    setProfile({
+      full_name: resolvedName,
+      email: user.email ?? data?.email ?? "",
+      role: resolvedRole,
+      created_at: data?.created_at,
+    });
+    setFullName(resolvedName);
     setLoading(false);
   }
 

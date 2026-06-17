@@ -14,27 +14,28 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const readyRef = React.useRef(false);
 
   useEffect(() => {
+    const markReady = () => {
+      readyRef.current = true;
+      setReady(true);
+    };
+
     // Supabase fires PASSWORD_RECOVERY when the reset link is opened
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setReady(true);
-      }
+      if (event === "PASSWORD_RECOVERY") markReady();
     });
 
     // Also check for an existing session (user already had the token exchanged)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true);
+      if (session) markReady();
     });
 
-    // If no event fires within 5s, the link is likely expired
+    // If no event fires within 8s, the link is likely expired
     const timeout = setTimeout(() => {
-      setInvalid((prev) => {
-        if (!prev && !ready) return true;
-        return prev;
-      });
-    }, 5000);
+      if (!readyRef.current) setInvalid(true);
+    }, 8000);
 
     return () => {
       subscription.unsubscribe();
