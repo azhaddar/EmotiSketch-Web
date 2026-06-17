@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+@media print {
+  /* 1. Hide absolutely EVERYTHING on the screen (Sidebar, Nav, etc.) */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 2. Make ONLY our report and everything inside it visible */
+  #printable-report,
+  #printable-report * {
+    visibility: visible;
+  }
+
+  /* 3. Move the report to the absolute top-left corner of the paper */
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* 4. Force the printer to print background colors and colored text! */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* 5. Hide the default browser headers/footers (page numbers, dates) if desired */
+  @page {
+    margin: 1cm;
+  }
+}
